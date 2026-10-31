@@ -1,7 +1,7 @@
-// Turns either k6 summary format into one shape the comparison code can rely on.
+// Turns either JSON summary format into one shape the comparison code can rely on.
 //
-// k6 writes two JSON shapes:
-//   - `k6 run --summary-export=file.json`  (legacy): metric stats sit directly on the metric,
+// There are two JSON shapes:
+//   - `--summary-export=file.json`  (legacy): metric stats sit directly on the metric,
 //     thresholds are `{ "p(95)<500": <failed: boolean> }`.
 //   - `handleSummary(data)` + JSON.stringify: stats live under `values`, the metric has a `type`,
 //     thresholds are `{ "p(95)<500": { ok: boolean } }`.
@@ -23,7 +23,7 @@ const TIME_METRIC = /(duration|waiting|connecting|tls_handshaking|sending|receiv
 /** @returns {Summary} */
 export function normalizeSummary(raw) {
   if (!raw || typeof raw !== 'object' || !raw.metrics || typeof raw.metrics !== 'object') {
-    throw new SummaryError('not a k6 summary: missing "metrics" object');
+    throw new SummaryError('not a load test summary: missing "metrics" object');
   }
   const entries = Object.entries(raw.metrics);
   const isHandleSummary = entries.some(([, m]) => m && typeof m === 'object' && 'values' in m);
@@ -97,7 +97,7 @@ export function splitName(name) {
   return { base: name.slice(0, open), tags };
 }
 
-/** True when the run did no measurable work (k6 crashed early, wrong URL, 0 iterations...). */
+/** True when the run did no measurable work (the test crashed early, wrong URL, 0 iterations...). */
 export function isEmptyRun(summary) {
   const reqs = summary.metrics.get('http_reqs')?.values.count ?? 0;
   const iterations = summary.metrics.get('iterations')?.values.count ?? 0;

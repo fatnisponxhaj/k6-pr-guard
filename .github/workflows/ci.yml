@@ -42,16 +42,15 @@ jobs:
         with:
           node-version: 24
       - uses: grafana/setup-k6-action@v1
-      - run: k6 version
 
       - name: Start demo server
         run: |
           node examples/demo-server.js &
           for i in $(seq 1 20); do curl -sf http://localhost:3333/ >/dev/null && break; sleep 0.5; done
 
-      - name: Run k6
+      - name: Run load test
         continue-on-error: true
-        # The test's handleSummary() writes k6-summary.json.
+        # The test's handleSummary() writes summary.json.
         run: k6 run --quiet examples/load-test.js
         env:
           DURATION: 15s
@@ -59,9 +58,9 @@ jobs:
       - name: p95 Guard
         uses: ./
         with:
-          summary: k6-summary.json
+          summary: summary.json
 
-  # Proves on every push, with the latest k6, that a real slowdown fails and an unchanged run passes.
+  # Proves on every push, with a real load test, that a real slowdown fails and an unchanged run passes.
   # Uses the "baseline" input, so it doesn't touch the cache or post comments.
   regression-detection:
     runs-on: ubuntu-latest
@@ -77,7 +76,7 @@ jobs:
           record() { # <name> <delay ms>
             DELAY_MS=$2 node examples/demo-server.js & pid=$!
             for i in $(seq 1 20); do curl -sf http://localhost:3333/ >/dev/null && break; sleep 0.5; done
-            # Write both k6 output formats from the same run.
+            # Write both summary formats from the same run.
             DURATION=10s SUMMARY_FILE=$1.json k6 run --quiet --summary-export=$1.export.json examples/load-test.js
             kill $pid; wait $pid 2>/dev/null || true
           }

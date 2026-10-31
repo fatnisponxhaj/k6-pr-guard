@@ -3,9 +3,9 @@ import assert from 'node:assert/strict';
 import { normalizeSummary, splitName, isEmptyRun, SummaryError } from '../src/parse.js';
 import { load } from './helpers.js';
 
-// Fixtures were recorded with k6 v0.52 against examples/demo-server.js.
+// Fixtures are real summaries recorded against examples/demo-server.js.
 for (const run of ['baseline', 'regressed', 'broken']) {
-  test(`${run}: both k6 output formats normalize to the same numbers`, () => {
+  test(`${run}: both summary formats normalize to the same numbers`, () => {
     const a = load(`${run}.handle-summary.json`);
     const b = load(`${run}.summary-export.json`);
     assert.equal(a.format, 'handle-summary');
@@ -43,7 +43,7 @@ test('splits tagged sub-metric names', () => {
   assert.deepEqual(splitName('http_req_duration{url:http://x:1/a}').tags, { url: 'http://x:1/a' });
 });
 
-test('rejects input that is not a k6 summary', () => {
+test('rejects input that is not a load test summary', () => {
   assert.throws(() => normalizeSummary(null), SummaryError);
   assert.throws(() => normalizeSummary({ foo: 1 }), SummaryError);
   assert.throws(() => normalizeSummary([]), SummaryError);

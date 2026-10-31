@@ -17,17 +17,17 @@ body:
     validations:
       required: true
   - type: input
-    id: k6
+    id: tool
     attributes:
-      label: k6 version
-      description: Output of `k6 version`
-      placeholder: k6 v1.3.0
+      label: Load testing tool and version
+      description: The output of your load testing tool's version command
+      placeholder: e.g. v1.3.0
     validations:
       required: true
   - type: dropdown
     id: format
     attributes:
-      label: How do you write the k6 summary?
+      label: How do you write the summary?
       options:
         - "--summary-export"
         - "handleSummary()"
@@ -36,7 +36,7 @@ body:
     id: workflow
     attributes:
       label: Workflow
-      description: The k6 and p95 Guard steps from your workflow file.
+      description: The load test and p95 Guard steps from your workflow file.
       render: yaml
   - type: textarea
     id: logs

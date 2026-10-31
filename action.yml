@@ -1,16 +1,16 @@
 name: p95 Guard
-description: Catch performance regressions in PRs. Compares k6 load test results with the last good run and posts a pass/fail comment.
+description: Catch performance regressions in PRs. Compares load test results with the last good run and posts a pass/fail comment.
 branding:
   icon: activity
   color: purple
 
 inputs:
   summary:
-    description: Path to the k6 JSON summary (from --summary-export or handleSummary).
-    default: k6-summary.json
+    description: Path to the JSON summary of the load test (from --summary-export or handleSummary).
+    default: summary.json
   name:
     description: >
-      Test name, when one repo runs several k6 tests (e.g. "api", "checkout").
+      Test name, when one repo runs several load tests (e.g. "api", "checkout").
       Each name gets its own baseline and its own PR comment. Letters, digits, ".", "_" and "-".
     default: ''
   metrics:
@@ -44,7 +44,7 @@ inputs:
     description: Max drop of the checks pass rate, in percentage points.
     default: '1'
   ignore-thresholds:
-    description: Set to "true" to not fail when k6's own thresholds failed.
+    description: Set to "true" to not fail when the load test's own thresholds failed.
     default: 'false'
   fail-on-regression:
     description: Set to "false" to only report, never fail the job.
@@ -206,7 +206,7 @@ runs:
           mkdir -p "$(dirname "$CACHE_PATH")" && cp "$SUMMARY" "$CACHE_PATH"
           echo "This run becomes the new baseline."
         elif [ "$code" -eq 1 ]; then
-          echo "::warning::k6 run did not pass, so it was not saved as the baseline."
+          echo "::warning::The load test did not pass, so it was not saved as the baseline."
         else
           exit "$code"
         fi
