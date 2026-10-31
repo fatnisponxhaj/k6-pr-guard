@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// p95guard: compare a k6 JSON summary with a baseline and print a pass/fail Markdown report.
+// p95guard: compare a load test's JSON summary with a baseline and print a pass/fail Markdown report.
 // Exit codes: 0 = pass, 1 = regression, 2 = bad input or usage.
 
 import { appendFileSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
@@ -12,7 +12,7 @@ import { prNumberFromEvent, upsertPrComment } from './github.js';
 
 const HELP = `Usage: p95guard --current <summary.json> [--baseline <summary.json>] [options]
 
-Reads k6 JSON summaries (from --summary-export or handleSummary) and fails when
+Reads load test JSON summaries (from --summary-export or handleSummary) and fails when
 latency or error rate got worse than the budget allows.
 
 Input
@@ -26,14 +26,14 @@ Budgets
   --min-delta-ms <ms>     Ignore latency changes smaller than this (default: ${DEFAULTS.minDeltaMs})
   --error-rate <pp>       Max http_req_failed increase in percentage points (default: ${DEFAULTS.errorRatePp})
   --checks <pp>           Max drop of the checks pass rate in percentage points (default: ${DEFAULTS.checksDropPp})
-  --ignore-thresholds     Don't fail when k6's own thresholds failed
+  --ignore-thresholds     Don't fail when the load test's own thresholds failed
   --allow-empty           Don't fail when the run made no requests
 
 Output
   --markdown <file>       Also write the report to a file
   --json <file>           Write the full comparison result as JSON
   --comment               Post or update a PR comment (needs GITHUB_TOKEN, runs inside GitHub Actions)
-  --name <id>             Test name, when one repo runs several k6 tests. Each name gets its own
+  --name <id>             Test name, when one repo runs several load tests. Each name gets its own
                           PR comment. Letters, digits, ".", "_" and "-" only.
   --title <text>          Report heading (default: "p95 Guard", plus the name if given)
   --baseline-label <text> Says what the baseline is, e.g. "the last good run on main (abc1234)"
@@ -154,7 +154,7 @@ function loadSummary(path) {
   } catch {
     throw new Error(`cannot read ${path}`);
   }
-  if (!text.trim()) throw new SummaryError(`${path} is empty. Did k6 finish and write its summary?`);
+  if (!text.trim()) throw new SummaryError(`${path} is empty. Did the load test finish and write its summary?`);
   try {
     return normalizeSummary(JSON.parse(text));
   } catch (e) {

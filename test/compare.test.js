@@ -19,7 +19,7 @@ test('real runs: slower server with errors fails', () => {
   assert.equal(row(r, 'http_req_failed', 'rate').status, 'regressed');
 });
 
-test('real runs: k6 threshold failure fails even with same latency', () => {
+test('real runs: a failed threshold fails even with same latency', () => {
   const r = compare(load('broken.summary-export.json'), load('baseline.summary-export.json'));
   assert.equal(r.verdict, 'fail');
   assert.deepEqual(r.failedThresholds, [{ metric: 'http_req_failed', expr: 'rate<0.05' }]);
@@ -117,7 +117,7 @@ test('per-scenario regression fails even when the total is fine', () => {
   assert.equal(row(r, 'http_req_duration{scenario:checkout}', 'p(95)').status, 'regressed');
 });
 
-test("k6's own expected_response sub-metric is skipped", () => {
+test('the automatic expected_response sub-metric is skipped', () => {
   const extra = { 'http_req_duration{expected_response:true}': subTrend(100) };
   const r = compare(makeSummary({ extra }), makeSummary({ extra }));
   assert.ok(!r.rows.some((x) => x.metric.includes('expected_response')));

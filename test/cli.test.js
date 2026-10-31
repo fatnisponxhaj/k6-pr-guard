@@ -52,7 +52,7 @@ test('bad input exits 2 with a clear message', async () => {
   writeFileSync(join(dir, 'other.json'), '{"hello": 1}');
   assert.match((await run(['--current', join(dir, 'empty.json')])).err, /is empty/);
   assert.match((await run(['--current', join(dir, 'bad.json')])).err, /invalid JSON/);
-  assert.match((await run(['--current', join(dir, 'other.json')])).err, /not a k6 summary/);
+  assert.match((await run(['--current', join(dir, 'other.json')])).err, /not a load test summary/);
   assert.match((await run(['--current', join(dir, 'missing.json')])).err, /cannot read/);
   assert.equal((await run([])).code, 2);
   assert.equal((await run(['--current', join(dir, 'bad.json')])).code, 2);

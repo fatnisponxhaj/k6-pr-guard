@@ -1,4 +1,4 @@
-// Compares a k6 run against the last good run and decides pass or fail.
+// Compares a load test run against the last good run and decides pass or fail.
 
 import { isEmptyRun } from './parse.js';
 
@@ -19,7 +19,7 @@ export const DEFAULTS = Object.freeze({
   savingBaseline: false,
 });
 
-// Sub-metric k6 adds on its own; it mostly duplicates the parent metric.
+// Sub-metric the load test adds on its own; it mostly duplicates the parent metric.
 const IGNORED_TAGS = ['expected_response:true'];
 
 /**
@@ -33,7 +33,7 @@ export function compare(current, baseline, options = {}) {
   const rows = [];
 
   if (isEmptyRun(current)) {
-    const msg = 'The current run made no HTTP requests and no iterations. Did k6 fail to start or hit the wrong URL?';
+    const msg = 'The current run made no HTTP requests and no iterations. Did the load test fail to start or hit the wrong URL?';
     (opts.failOnEmpty ? reasons : notes).push(msg);
   }
 
@@ -42,7 +42,7 @@ export function compare(current, baseline, options = {}) {
     baseline = null;
   }
   if (!baseline && !opts.savingBaseline) {
-    notes.push('No baseline yet: only k6 thresholds were checked. Once this lands on the main branch, its run becomes the baseline.');
+    notes.push('No baseline yet: only the test\'s own thresholds were checked. Once this lands on the main branch, its run becomes the baseline.');
   }
 
   // Latency (trend) metrics, including tagged sub-metrics such as http_req_duration{scenario:checkout}.
@@ -68,7 +68,7 @@ export function compare(current, baseline, options = {}) {
     }
   }
   for (const key of missingStats) {
-    notes.push(`\`${key}\` is not in the k6 summary. Add it to \`summaryTrendStats\` in your test options to compare it.`);
+    notes.push(`\`${key}\` is not in the summary. Add it to \`summaryTrendStats\` in your test options to compare it.`);
   }
 
   // Error rate: higher is worse.
@@ -88,13 +88,13 @@ export function compare(current, baseline, options = {}) {
     reasons.push(describeRegression(metric, regressed.filter((r) => r.metric === metric)));
   }
 
-  // k6's own thresholds.
+  // The load test's own thresholds.
   const failedThresholds = [];
   for (const m of current.metrics.values()) {
     for (const t of m.thresholds) if (!t.ok) failedThresholds.push({ metric: m.name, expr: t.expr });
   }
   if (failedThresholds.length && opts.failOnThresholds) {
-    for (const t of failedThresholds) reasons.push(`k6 threshold failed: \`${t.metric}\` \`${t.expr}\``);
+    for (const t of failedThresholds) reasons.push(`Threshold failed: \`${t.metric}\` \`${t.expr}\``);
   }
   if (baseline) notes.push(...thresholdChanges(baseline, current));
 
