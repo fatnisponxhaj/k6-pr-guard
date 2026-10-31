@@ -10,7 +10,7 @@ All notable changes are listed here. The project follows [semantic versioning](h
 - CLI flags `--upload` (key from `P95GUARD_API_KEY`) and `--api-url`.
 - For pull requests, uploads use the PR's head commit and branch, not GitHub's temporary merge commit.
 
-## [0.3.1] - unreleased
+## [0.3.1] - 2026-10-31
 
 ### Changed
 - Documentation, messages and the PR comment describe load tests in general and no longer name a specific tool.
