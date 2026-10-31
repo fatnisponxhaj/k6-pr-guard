@@ -49,7 +49,7 @@ jobs:
           summary: k6-summary.json
 ```
 
-On pushes to `main`, a run that passes its thresholds is saved as the baseline. On pull requests, the run is compared with the baseline of the commit the PR is based on (or the newest one)..
+On pushes to `main`, a run that passes its thresholds is saved as the baseline. On pull requests, the run is compared with the baseline of the commit the PR is based on (or the newest one).
 
 ### Inputs
 
