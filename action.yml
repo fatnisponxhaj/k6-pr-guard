@@ -8,10 +8,25 @@ inputs:
   summary:
     description: Path to the k6 JSON summary (from --summary-export or handleSummary).
     default: k6-summary.json
+  name:
+    description: >
+      Test name, when one repo runs several k6 tests (e.g. "api", "checkout").
+      Each name gets its own baseline and its own PR comment. Letters, digits, ".", "_" and "-".
+    default: ''
+  metrics:
+    description: >
+      Trend metrics to compare, separated by commas or new lines. Tagged sub-metrics
+      (per scenario) are included automatically.
+    default: http_req_duration
+  baseline:
+    description: >
+      Path to a baseline summary file to compare with, instead of the last good run from the cache.
+      Use it for a baseline you keep in the repo or download yourself.
+    default: ''
   mode:
     description: >
-      "auto" saves a baseline on pushes to the default branch and compares on pull requests.
-      Or force "compare" or "save-baseline".
+      "auto" saves a baseline on pushes to the default branch and compares everywhere else
+      (always compares when "baseline" is set). Or force "compare" or "save-baseline".
     default: auto
   p95-budget:
     description: Max p(95) latency increase, in percent.
@@ -38,7 +53,7 @@ inputs:
     description: Post (and keep updating) a PR comment with the report.
     default: 'true'
   cache-key-prefix:
-    description: Cache key prefix for the stored baseline. Change it if you run several k6 tests in one repo.
+    description: Cache key prefix for the stored baseline. Prefer "name" to separate several tests.
     default: k6-pr-guard-baseline
   github-token:
     description: Token used to post the PR comment. Needs pull-requests write permission.
@@ -49,8 +64,17 @@ outputs:
     description: '"pass" or "fail".'
     value: ${{ steps.compare.outputs.verdict || steps.check.outputs.verdict }}
   baseline-found:
-    description: '"true" when a baseline was restored for the comparison.'
-    value: ${{ steps.restore.outputs.cache-matched-key != '' }}
+    description: '"true" when there was a baseline to compare with.'
+    value: ${{ steps.compare.outputs.baseline-found || steps.check.outputs.baseline-found }}
+  regressions:
+    description: Number of numbers (stat per metric) that got worse than the budget allows.
+    value: ${{ steps.compare.outputs.regressions || steps.check.outputs.regressions }}
+  report:
+    description: Path to the Markdown report, e.g. to send it to Slack or Teams yourself.
+    value: ${{ steps.compare.outputs.report || steps.check.outputs.report }}
+  mode:
+    description: '"compare" or "save-baseline", after resolving "auto".'
+    value: ${{ steps.mode.outputs.mode }}
 
 runs:
   using: composite
@@ -59,28 +83,46 @@ runs:
       shell: bash
       env:
         MODE: ${{ inputs.mode }}
+        NAME: ${{ inputs.name }}
+        BASELINE: ${{ inputs.baseline }}
+        PREFIX: ${{ inputs.cache-key-prefix }}
         EVENT: ${{ github.event_name }}
         REF: ${{ github.ref }}
         DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
       run: |
+        if [ -n "$NAME" ] && ! [[ "$NAME" =~ ^[A-Za-z0-9._-]{1,64}$ ]]; then
+          echo "::error::k6-pr-guard: name may only use letters, digits, '.', '_' and '-' (got '$NAME')"
+          exit 2
+        fi
         mode="$MODE"
         if [ "$mode" = auto ]; then
-          if [[ "$EVENT" == pull_request* ]]; then mode=compare
+          if [ -n "$BASELINE" ] || [[ "$EVENT" == pull_request* ]]; then mode=compare
           elif [ "$REF" = "refs/heads/$DEFAULT_BRANCH" ]; then mode=save-baseline
           else mode=compare; fi
         fi
-        echo "k6-pr-guard mode: $mode"
-        echo "mode=$mode" >> "$GITHUB_OUTPUT"
+        case "$mode" in compare|save-baseline) ;; *)
+          echo "::error::k6-pr-guard: mode must be auto, compare or save-baseline (got '$MODE')"
+          exit 2 ;;
+        esac
+        # The cache path is part of the cache version, so different names can never restore each other's
+        # baseline, even when one key prefix matches another ("api-" also matches "api-v2-...").
+        if [ -n "$NAME" ]; then
+          path=".k6-pr-guard/$NAME/baseline.json"; key="$PREFIX-$NAME"
+        else
+          path=".k6-pr-guard/baseline.json"; key="$PREFIX"
+        fi
+        echo "k6-pr-guard mode: $mode${NAME:+ (name: $NAME)}"
+        { echo "mode=$mode"; echo "path=$path"; echo "key=$key"; } >> "$GITHUB_OUTPUT"
 
     # Caches saved on the default branch can be restored from pull requests.
     # Prefer the exact commit the PR is based on, else the newest baseline.
     - id: restore
-      if: steps.mode.outputs.mode == 'compare'
+      if: steps.mode.outputs.mode == 'compare' && inputs.baseline == ''
       uses: actions/cache/restore@v6
       with:
-        path: .k6-pr-guard/baseline.json
-        key: ${{ inputs.cache-key-prefix }}-${{ github.event.pull_request.base.sha || github.sha }}
-        restore-keys: ${{ inputs.cache-key-prefix }}-
+        path: ${{ steps.mode.outputs.path }}
+        key: ${{ steps.mode.outputs.key }}-${{ github.event.pull_request.base.sha || github.sha }}
+        restore-keys: ${{ steps.mode.outputs.key }}-
 
     - id: compare
       if: steps.mode.outputs.mode == 'compare'
@@ -88,6 +130,12 @@ runs:
       env:
         GITHUB_TOKEN: ${{ inputs.github-token }}
         SUMMARY: ${{ inputs.summary }}
+        NAME: ${{ inputs.name }}
+        METRICS: ${{ inputs.metrics }}
+        BASELINE_INPUT: ${{ inputs.baseline }}
+        CACHE_PATH: ${{ steps.mode.outputs.path }}
+        MATCHED_KEY: ${{ steps.restore.outputs.cache-matched-key }}
+        DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
         P95: ${{ inputs.p95-budget }}
         P99: ${{ inputs.p99-budget }}
         MIN_DELTA: ${{ inputs.min-delta-ms }}
@@ -97,9 +145,19 @@ runs:
         FAIL: ${{ inputs.fail-on-regression }}
         COMMENT: ${{ inputs.comment }}
       run: |
-        args=(--current "$SUMMARY" --baseline .k6-pr-guard/baseline.json
+        if [ -n "$BASELINE_INPUT" ]; then
+          baseline="$BASELINE_INPUT"; label="\`$BASELINE_INPUT\`"
+        else
+          baseline="$CACHE_PATH"
+          sha="${MATCHED_KEY##*-}"
+          label="the last good run on \`${DEFAULT_BRANCH:-the default branch}\`${MATCHED_KEY:+ (${sha:0:7})}"
+        fi
+        args=(--current "$SUMMARY" --baseline "$baseline" --baseline-label "$label"
               --p95 "$P95" --p99 "$P99" --min-delta-ms "$MIN_DELTA"
-              --error-rate "$ERRORS" --checks "$CHECKS" --quiet)
+              --error-rate "$ERRORS" --checks "$CHECKS"
+              --markdown "$RUNNER_TEMP/k6-pr-guard${NAME:+-$NAME}.md" --quiet)
+        for m in ${METRICS//,/ }; do args+=(--metric "$m"); done
+        [ -n "$NAME" ] && args+=(--name "$NAME")
         [ "$IGNORE_THRESHOLDS" = true ] && args+=(--ignore-thresholds)
         [ "$COMMENT" = true ] && args+=(--comment)
         [ "$FAIL" = true ] || args+=(--warn-only)
@@ -111,21 +169,31 @@ runs:
       shell: bash
       env:
         SUMMARY: ${{ inputs.summary }}
+        NAME: ${{ inputs.name }}
+        METRICS: ${{ inputs.metrics }}
+        CACHE_PATH: ${{ steps.mode.outputs.path }}
         IGNORE_THRESHOLDS: ${{ inputs.ignore-thresholds }}
       run: |
-        args=(--current "$SUMMARY" --quiet --warn-only --json .k6-pr-guard-result.json)
+        args=(--current "$SUMMARY" --saving-baseline --quiet
+              --markdown "$RUNNER_TEMP/k6-pr-guard${NAME:+-$NAME}.md")
+        for m in ${METRICS//,/ }; do args+=(--metric "$m"); done
+        [ -n "$NAME" ] && args+=(--name "$NAME")
         [ "$IGNORE_THRESHOLDS" = true ] && args+=(--ignore-thresholds)
+        set +e
         node "$GITHUB_ACTION_PATH/src/cli.js" "${args[@]}"
-        if grep -q '"verdict": "pass"' .k6-pr-guard-result.json; then
-          mkdir -p .k6-pr-guard && cp "$SUMMARY" .k6-pr-guard/baseline.json
+        code=$?
+        set -e
+        if [ "$code" -eq 0 ]; then
+          mkdir -p "$(dirname "$CACHE_PATH")" && cp "$SUMMARY" "$CACHE_PATH"
           echo "This run becomes the new baseline."
-        else
+        elif [ "$code" -eq 1 ]; then
           echo "::warning::k6 run did not pass, so it was not saved as the baseline."
+        else
+          exit "$code"
         fi
-        rm -f .k6-pr-guard-result.json
 
     - if: steps.mode.outputs.mode == 'save-baseline' && steps.check.outputs.verdict == 'pass'
       uses: actions/cache/save@v6
       with:
-        path: .k6-pr-guard/baseline.json
-        key: ${{ inputs.cache-key-prefix }}-${{ github.sha }}
+        path: ${{ steps.mode.outputs.path }}
+        key: ${{ steps.mode.outputs.key }}-${{ github.sha }}

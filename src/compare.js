@@ -15,6 +15,8 @@ export const DEFAULTS = Object.freeze({
   checksDropPp: 1,
   failOnThresholds: true,
   failOnEmpty: true,
+  // True on the default branch, where a passing run replaces the baseline instead of being compared.
+  savingBaseline: false,
 });
 
 // Sub-metric k6 adds on its own; it mostly duplicates the parent metric.
@@ -39,7 +41,7 @@ export function compare(current, baseline, options = {}) {
     notes.push('The baseline run was empty, so it was ignored.');
     baseline = null;
   }
-  if (!baseline) {
+  if (!baseline && !opts.savingBaseline) {
     notes.push('No baseline yet: only k6 thresholds were checked. Once this lands on the main branch, its run becomes the baseline.');
   }
 
@@ -80,8 +82,10 @@ export function compare(current, baseline, options = {}) {
     rows.push(rateRow('checks', 'rate', baseline?.metrics.get('checks')?.values.rate, checks.values.rate, opts.checksDropPp, -1));
   }
 
-  for (const row of rows) {
-    if (row.status === 'regressed') reasons.push(describeRegression(row));
+  // One reason per metric, so p(95) and p(99) of the same metric share a line.
+  const regressed = rows.filter((r) => r.status === 'regressed');
+  for (const metric of new Set(regressed.map((r) => r.metric))) {
+    reasons.push(describeRegression(metric, regressed.filter((r) => r.metric === metric)));
   }
 
   // k6's own thresholds.
@@ -101,9 +105,17 @@ export function compare(current, baseline, options = {}) {
     }
   }
 
+  const verdict = reasons.length ? 'fail' : 'pass';
+  if (opts.savingBaseline) {
+    notes.unshift(verdict === 'pass'
+      ? 'This run passed, so it is saved as the new baseline for pull requests.'
+      : 'This run did not pass, so the previous baseline is kept.');
+  }
+
   return {
-    verdict: reasons.length ? 'fail' : 'pass',
+    verdict,
     hasBaseline: Boolean(baseline),
+    regressions: regressed.length,
     reasons,
     notes,
     rows,
@@ -153,14 +165,18 @@ function rateRow(metric, stat, baseline, current, budgetPp, direction) {
   return row;
 }
 
-function describeRegression(row) {
-  if (row.unit === '%') {
-    const dir = row.metric === 'checks' ? '−' : '+';
-    return `\`${row.metric}\` ${row.stat} went from ${fmtPct(row.baseline)} to ${fmtPct(row.current)} (budget ${dir}${row.budget}pp)`;
-  }
-  const pct = Number.isFinite(row.pct) ? `+${row.pct.toFixed(1)}%` : 'up from 0';
-  const fmt = row.unit === 'ms' ? fmtMs : fmtNumber;
-  return `\`${row.metric}\` ${row.stat} went from ${fmt(row.baseline)} to ${fmt(row.current)} (${pct}, budget +${row.budget}%)`;
+// "`http_req_duration` p(95) 29.3 ms → 69.5 ms (+137.0%), p(99) 29.9 ms → 70.3 ms (+135.2%)"
+function describeRegression(metric, rows) {
+  const parts = rows.map((row) => {
+    if (row.unit === '%') {
+      const pp = `${row.delta > 0 ? '+' : '−'}${Math.abs(row.delta).toFixed(2)}pp`;
+      return `${row.stat} ${fmtPct(row.baseline)} → ${fmtPct(row.current)} (${pp})`;
+    }
+    const fmt = row.unit === 'ms' ? fmtMs : fmtNumber;
+    const pct = Number.isFinite(row.pct) ? `+${row.pct.toFixed(1)}%` : 'up from 0';
+    return `${row.stat} ${fmt(row.baseline)} → ${fmt(row.current)} (${pct})`;
+  });
+  return `\`${metric}\` ${parts.join(', ')}`;
 }
 
 function thresholdChanges(baseline, current) {

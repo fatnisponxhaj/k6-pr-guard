@@ -1,0 +1,46 @@
+name: Bug report
+description: Something went wrong or the report looks wrong
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What did you expect instead?
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: k6 PR Guard version
+      placeholder: "v0.2.0 (or the @ref in your workflow)"
+    validations:
+      required: true
+  - type: input
+    id: k6
+    attributes:
+      label: k6 version
+      description: Output of `k6 version`
+      placeholder: k6 v1.3.0
+    validations:
+      required: true
+  - type: dropdown
+    id: format
+    attributes:
+      label: How do you write the k6 summary?
+      options:
+        - "--summary-export"
+        - "handleSummary()"
+        - Not sure
+  - type: textarea
+    id: workflow
+    attributes:
+      label: Workflow
+      description: The k6 and k6 PR Guard steps from your workflow file.
+      render: yaml
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs or report
+      description: The k6 PR Guard step log, or the PR comment. Remove anything private.
+      render: text

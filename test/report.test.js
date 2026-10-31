@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { compare } from '../src/compare.js';
-import { renderMarkdown, MARKER } from '../src/report.js';
+import { renderMarkdown, markerFor, MARKER, NAME_PATTERN } from '../src/report.js';
 import { load, makeSummary } from './helpers.js';
 
 test('failing report has marker, reasons and table', () => {
@@ -35,4 +35,27 @@ test('pipes in tag values do not break the table', () => {
   const extra = { 'http_req_duration{name:a|b}': { type: 'trend', contains: 'time', values: { 'p(95)': 1, 'p(99)': 1 } } };
   const md = renderMarkdown(compare(makeSummary({ extra }), null));
   assert.match(md, /a\\\|b/);
+});
+
+test('named tests get their own marker and heading', () => {
+  const md = renderMarkdown(compare(makeSummary(), null), { name: 'checkout-api' });
+  assert.ok(md.startsWith('<!-- k6-pr-guard:checkout-api -->\n'));
+  assert.match(md, /## ✅ k6 PR Guard · checkout-api: no performance regression/);
+});
+
+test('markers never match each other by substring', () => {
+  const markers = [markerFor(undefined), markerFor('api'), markerFor('api-v2'), markerFor('ap')];
+  for (const a of markers) for (const b of markers) if (a !== b) assert.ok(!a.includes(b), `${a} contains ${b}`);
+  assert.equal(markerFor(''), MARKER);
+});
+
+test('baseline label says what was compared', () => {
+  const s = makeSummary();
+  const md = renderMarkdown(compare(s, s), { baselineLabel: 'the last good run on `main` (abc1234)' });
+  assert.match(md, /Compared with the last good run on `main` \(abc1234\)\./);
+});
+
+test('name pattern rejects anything that could break the marker or cache key', () => {
+  for (const ok of ['api', 'checkout-api', 'v2.load_test', 'A1']) assert.ok(NAME_PATTERN.test(ok), ok);
+  for (const bad of ['', 'a b', 'x-->', 'a/b', 'a:b', '<!--', 'x'.repeat(65)]) assert.ok(!NAME_PATTERN.test(bad), bad);
 });

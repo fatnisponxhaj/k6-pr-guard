@@ -4,23 +4,33 @@ on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch:
 
 permissions:
   contents: read
   pull-requests: write
 
+# Newer pushes to a PR cancel older runs. Runs on main always finish, since they save the baseline.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   unit:
+    name: unit (Node ${{ matrix.node }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [20, 22, 24]
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
         with:
-          node-version: 24
+          node-version: ${{ matrix.node }}
       - run: npm test
 
-  # Runs the action against itself: a load test on the demo server.
-  # To see a regression comment, open a PR that raises DELAY_MS below (e.g. to 60).
+  # Runs the action the way users do: save a baseline on main, compare on PRs, comment on the PR.
   e2e:
     runs-on: ubuntu-latest
     env:
@@ -32,6 +42,7 @@ jobs:
         with:
           node-version: 24
       - uses: grafana/setup-k6-action@v1
+      - run: k6 version
 
       - name: Start demo server
         run: |
@@ -49,3 +60,64 @@ jobs:
         uses: ./
         with:
           summary: k6-summary.json
+
+  # Proves on every push, with the latest k6, that a real slowdown fails and an unchanged run passes.
+  # Uses the "baseline" input, so it doesn't touch the cache or post comments.
+  regression-detection:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - uses: grafana/setup-k6-action@v1
+
+      - name: Record a fast and a slow run
+        run: |
+          record() { # <name> <delay ms>
+            DELAY_MS=$2 node examples/demo-server.js & pid=$!
+            for i in $(seq 1 20); do curl -sf http://localhost:3333/ >/dev/null && break; sleep 0.5; done
+            # Write both k6 output formats from the same run.
+            DURATION=10s SUMMARY_FILE=$1.json k6 run --quiet --summary-export=$1.export.json examples/load-test.js
+            kill $pid; wait $pid 2>/dev/null || true
+          }
+          record fast 20
+          record slow 60
+
+      - name: Guard a slowdown (expected to fail)
+        id: slow
+        uses: ./
+        with:
+          name: self-test-slowdown
+          mode: compare
+          summary: slow.json
+          baseline: fast.json
+          comment: false
+          fail-on-regression: false
+
+      - name: Guard the same run in both formats (expected to pass)
+        id: same
+        uses: ./
+        with:
+          name: self-test-formats
+          mode: compare
+          summary: fast.export.json
+          baseline: fast.json
+          comment: false
+          fail-on-regression: false
+
+      - name: Check verdicts
+        env:
+          SLOW: ${{ steps.slow.outputs.verdict }}
+          SLOW_REGRESSIONS: ${{ steps.slow.outputs.regressions }}
+          SLOW_BASELINE: ${{ steps.slow.outputs.baseline-found }}
+          SAME: ${{ steps.same.outputs.verdict }}
+          REPORT: ${{ steps.slow.outputs.report }}
+        run: |
+          echo "slowdown: $SLOW ($SLOW_REGRESSIONS regressions, baseline found: $SLOW_BASELINE)"
+          echo "same run, two formats: $SAME"
+          test "$SLOW" = fail
+          test "$SLOW_BASELINE" = true
+          test "$SLOW_REGRESSIONS" -gt 0
+          test "$SAME" = pass
+          grep -q '<!-- k6-pr-guard:self-test-slowdown -->' "$REPORT"

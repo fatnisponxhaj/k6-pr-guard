@@ -3,8 +3,11 @@
 import { readFileSync } from 'node:fs';
 import { MARKER } from './report.js';
 
-/** Reads the PR number from the Actions event payload, or null outside a pull_request event. */
-export function prNumberFromEvent(eventPath = process.env.GITHUB_EVENT_PATH) {
+/**
+ * Reads the PR number from the Actions event payload, or null outside a pull_request event.
+ * The path is always passed in (no process.env fallback), so callers control which environment is used.
+ */
+export function prNumberFromEvent(eventPath) {
   if (!eventPath) return null;
   try {
     const event = JSON.parse(readFileSync(eventPath, 'utf8'));
@@ -15,7 +18,7 @@ export function prNumberFromEvent(eventPath = process.env.GITHUB_EVENT_PATH) {
 }
 
 /** Creates the PR comment, or updates the one we posted before. Returns its URL. */
-export async function upsertPrComment({ token, repo, prNumber, body, apiUrl = 'https://api.github.com', fetchImpl = fetch }) {
+export async function upsertPrComment({ token, repo, prNumber, body, marker = MARKER, apiUrl = 'https://api.github.com', fetchImpl = fetch }) {
   const headers = {
     authorization: `Bearer ${token}`,
     accept: 'application/vnd.github+json',
@@ -32,7 +35,7 @@ export async function upsertPrComment({ token, repo, prNumber, body, apiUrl = 'h
   let existing = null;
   for (let page = 1; !existing; page++) {
     const comments = await call('GET', `${apiUrl}/repos/${repo}/issues/${prNumber}/comments?per_page=100&page=${page}`);
-    existing = comments.find((c) => typeof c.body === 'string' && c.body.includes(MARKER)) ?? null;
+    existing = comments.find((c) => typeof c.body === 'string' && c.body.includes(marker)) ?? null;
     if (comments.length < 100) break;
   }
 

@@ -1,0 +1,11 @@
+# Keeps the actions used here (and inside action.yml) up to date, so users never inherit
+# deprecation warnings like the Node 20 one.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      github-actions:
+        patterns: ['*']

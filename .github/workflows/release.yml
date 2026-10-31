@@ -1,0 +1,35 @@
+name: Release
+
+# When a release like v0.2.0 is published, move the major tag (v0) to it,
+# so everyone using `@v0` gets the new version.
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+
+jobs:
+  move-major-tag:
+    if: ${{ !github.event.release.prerelease }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Move major tag
+        env:
+          TAG: ${{ github.event.release.tag_name }}
+        run: |
+          if ! [[ "$TAG" =~ ^v([0-9]+)\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Release tag must look like v1.2.3, got '$TAG'"
+            exit 1
+          fi
+          major="v${BASH_REMATCH[1]}"
+          version="v$(node -p "require('./package.json').version")"
+          if [ "$version" != "$TAG" ]; then
+            echo "::error::package.json says $version but the release tag is $TAG. Bump package.json first."
+            exit 1
+          fi
+          git tag -f "$major" HEAD
+          git push -f origin "refs/tags/$major"
+          echo "Moved $major to $TAG ($(git rev-parse --short HEAD))"

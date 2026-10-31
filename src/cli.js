@@ -7,7 +7,7 @@ import { parseArgs } from 'node:util';
 import { pathToFileURL } from 'node:url';
 import { normalizeSummary, SummaryError } from './parse.js';
 import { compare, DEFAULTS } from './compare.js';
-import { renderMarkdown } from './report.js';
+import { markerFor, NAME_PATTERN, renderMarkdown } from './report.js';
 import { prNumberFromEvent, upsertPrComment } from './github.js';
 
 const HELP = `Usage: k6-pr-guard --current <summary.json> [--baseline <summary.json>] [options]
@@ -33,7 +33,11 @@ Output
   --markdown <file>       Also write the report to a file
   --json <file>           Write the full comparison result as JSON
   --comment               Post or update a PR comment (needs GITHUB_TOKEN, runs inside GitHub Actions)
-  --title <text>          Report heading (default: "k6 PR Guard")
+  --name <id>             Test name, when one repo runs several k6 tests. Each name gets its own
+                          PR comment. Letters, digits, ".", "_" and "-" only.
+  --title <text>          Report heading (default: "k6 PR Guard", plus the name if given)
+  --baseline-label <text> Says what the baseline is, e.g. "the last good run on main (abc1234)"
+  --saving-baseline       This run is a candidate baseline (default branch), not a PR to compare
   --warn-only             Always exit 0, even on a regression
   --quiet                 Don't print the report to stdout
   -h, --help              Show this help
@@ -58,7 +62,10 @@ export async function main(argv = process.argv.slice(2), env = process.env, out 
         markdown: { type: 'string' },
         json: { type: 'string' },
         comment: { type: 'boolean', default: false },
+        name: { type: 'string' },
         title: { type: 'string' },
+        'baseline-label': { type: 'string' },
+        'saving-baseline': { type: 'boolean', default: false },
         'warn-only': { type: 'boolean', default: false },
         quiet: { type: 'boolean', default: false },
         help: { type: 'boolean', short: 'h', default: false },
@@ -76,6 +83,10 @@ export async function main(argv = process.argv.slice(2), env = process.env, out 
     err.write(`--current is required\n\n${HELP}`);
     return 2;
   }
+  if (args.name !== undefined && !NAME_PATTERN.test(args.name)) {
+    err.write(`k6-pr-guard: --name may only use letters, digits, ".", "_" and "-" (max 64), got "${args.name}"\n`);
+    return 2;
+  }
 
   let options, current, baseline;
   try {
@@ -88,6 +99,7 @@ export async function main(argv = process.argv.slice(2), env = process.env, out 
       ...number('checks', args.checks, 'checksDropPp'),
       failOnThresholds: !args['ignore-thresholds'],
       failOnEmpty: !args['allow-empty'],
+      savingBaseline: args['saving-baseline'],
     };
     current = loadSummary(args.current);
     baseline = args.baseline && existsSync(args.baseline) ? loadSummary(args.baseline) : null;
@@ -98,21 +110,25 @@ export async function main(argv = process.argv.slice(2), env = process.env, out 
 
   const result = compare(current, baseline, options);
   const runUrl = env.GITHUB_RUN_ID ? `${env.GITHUB_SERVER_URL}/${env.GITHUB_REPOSITORY}/actions/runs/${env.GITHUB_RUN_ID}` : undefined;
-  const markdown = renderMarkdown(result, { title: args.title, runUrl });
+  const markdown = renderMarkdown(result, { name: args.name, title: args.title, baselineLabel: args['baseline-label'], runUrl });
 
   if (!args.quiet) out.write(markdown);
   if (args.markdown) writeFileSync(args.markdown, markdown);
   if (args.json) writeFileSync(args.json, JSON.stringify(result, null, 2));
   if (env.GITHUB_STEP_SUMMARY) appendFileSync(env.GITHUB_STEP_SUMMARY, markdown);
-  if (env.GITHUB_OUTPUT) appendFileSync(env.GITHUB_OUTPUT, `verdict=${result.verdict}\n`);
+  if (env.GITHUB_OUTPUT) {
+    const outputs = { verdict: result.verdict, 'baseline-found': result.hasBaseline, regressions: result.regressions };
+    if (args.markdown) outputs.report = args.markdown;
+    appendFileSync(env.GITHUB_OUTPUT, Object.entries(outputs).map(([k, v]) => `${k}=${v}\n`).join(''));
+  }
 
-  if (args.comment) await postComment(markdown, env, err);
+  if (args.comment) await postComment(markdown, markerFor(args.name), env, err);
 
   if (result.verdict === 'fail' && !args['warn-only']) return 1;
   return 0;
 }
 
-async function postComment(body, env, err) {
+async function postComment(body, marker, env, err) {
   const prNumber = prNumberFromEvent(env.GITHUB_EVENT_PATH);
   if (!prNumber) {
     err.write('k6-pr-guard: not a pull_request event, skipping the PR comment.\n');
@@ -123,7 +139,7 @@ async function postComment(body, env, err) {
     return;
   }
   try {
-    const url = await upsertPrComment({ token: env.GITHUB_TOKEN, repo: env.GITHUB_REPOSITORY, prNumber, body, apiUrl: env.GITHUB_API_URL });
+    const url = await upsertPrComment({ token: env.GITHUB_TOKEN, repo: env.GITHUB_REPOSITORY, prNumber, body, marker, apiUrl: env.GITHUB_API_URL });
     err.write(`k6-pr-guard: PR comment at ${url}\n`);
   } catch (e) {
     // Fork PRs get a read-only token. The report is still in the job summary, so don't fail the job over it.
