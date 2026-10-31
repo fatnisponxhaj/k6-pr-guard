@@ -24,7 +24,7 @@ jobs:
   e2e:
     runs-on: ubuntu-latest
     env:
-      DELAY_MS: 60
+      DELAY_MS: 20
       ERROR_RATE: 0
     steps:
       - uses: actions/checkout@v7
