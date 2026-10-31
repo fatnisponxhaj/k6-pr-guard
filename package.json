@@ -1,6 +1,6 @@
 {
   "name": "k6-pr-guard",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Compare each k6 run with the last good run and post p95/p99 and error-rate changes as a pass/fail PR comment.",
   "type": "module",
   "bin": {

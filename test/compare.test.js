@@ -72,7 +72,7 @@ test('error rate budget is in percentage points', () => {
 test('a drop in passed checks fails', () => {
   const r = compare(makeSummary({ checks: 0.97 }), makeSummary({ checks: 1 }));
   assert.equal(row(r, 'checks', 'rate').status, 'regressed');
-  assert.match(r.reasons.join('\n'), /checks.*budget −1pp/);
+  assert.deepEqual(r.reasons, ['`checks` rate 100.00% → 97.00% (−3.00pp)']);
 });
 
 test('no baseline: only thresholds count', () => {
@@ -153,4 +153,27 @@ test('custom trend metrics can be compared', () => {
   const r = compare(makeSummary({ extra: extra(200) }), makeSummary({ extra: extra(100) }), { trendMetrics: ['api_latency'] });
   assert.equal(r.verdict, 'fail');
   assert.ok(r.rows.every((x) => x.metric !== 'http_req_duration'));
+});
+
+test('one failure reason per metric, p(95) and p(99) together', () => {
+  const r = compare(load('regressed.handle-summary.json'), load('baseline.handle-summary.json'));
+  const latency = r.reasons.filter((x) => x.startsWith('`http_req_duration`'));
+  assert.equal(latency.length, 1);
+  assert.match(latency[0], /^`http_req_duration` p\(95\) [\d.]+ ms → [\d.]+ ms \(\+[\d.]+%\), p\(99\) [\d.]+ ms → [\d.]+ ms \(\+[\d.]+%\)$/);
+  assert.equal(r.regressions, 8); // rows, not reasons: 3 metrics × 2 stats + error rate + checks
+  assert.equal(r.reasons.length, 5);
+});
+
+test('saving a baseline: passing run says it becomes the baseline', () => {
+  const r = compare(makeSummary(), null, { savingBaseline: true });
+  assert.equal(r.verdict, 'pass');
+  assert.match(r.notes[0], /saved as the new baseline/);
+  assert.doesNotMatch(r.notes.join('\n'), /No baseline yet/);
+});
+
+test('saving a baseline: failing run keeps the old one', () => {
+  const s = makeSummary({ thresholds: { http_req_failed: { 'rate<0.01': { ok: false } } } });
+  const r = compare(s, null, { savingBaseline: true });
+  assert.equal(r.verdict, 'fail');
+  assert.match(r.notes[0], /previous baseline is kept/);
 });

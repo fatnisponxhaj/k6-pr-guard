@@ -68,7 +68,7 @@ test('writes markdown, json, step summary and output files', async () => {
   assert.ok(readFileSync(join(dir, 'r.md'), 'utf8').startsWith(MARKER));
   assert.equal(JSON.parse(readFileSync(join(dir, 'r.json'), 'utf8')).verdict, 'fail');
   assert.ok(readFileSync(env.GITHUB_STEP_SUMMARY, 'utf8').includes('performance regression'));
-  assert.equal(readFileSync(env.GITHUB_OUTPUT, 'utf8'), 'verdict=fail\n');
+  assert.equal(readFileSync(env.GITHUB_OUTPUT, 'utf8'), `verdict=fail\nbaseline-found=true\nregressions=8\nreport=${join(dir, 'r.md')}\n`);
 });
 
 test('--comment outside a pull request is skipped, not an error', async () => {
@@ -113,4 +113,40 @@ test('updates our earlier comment, even on page 2', async () => {
   const last = gh.calls.at(-1);
   assert.equal(`${last.method} ${last.url}`, 'PATCH https://api/repos/o/r/issues/comments/999');
   assert.equal(last.body.body, `${MARKER}\nnew`);
+});
+
+test('--name changes the marker and heading; bad names exit 2', async () => {
+  const r = await run(['--current', fixturePath('baseline.handle-summary.json'), '--name', 'api']);
+  assert.equal(r.code, 0);
+  assert.ok(r.out.startsWith('<!-- k6-pr-guard:api -->'));
+  assert.match(r.out, /k6 PR Guard · api/);
+  const bad = await run(['--current', fixturePath('baseline.handle-summary.json'), '--name', 'x -->']);
+  assert.equal(bad.code, 2);
+  assert.match(bad.err, /--name may only use/);
+});
+
+test('--baseline-label and --saving-baseline show up in the report', async () => {
+  const base = fixturePath('baseline.handle-summary.json');
+  const label = await run(['--current', base, '--baseline', base, '--baseline-label', 'the last good run on `main` (abc1234)']);
+  assert.match(label.out, /Compared with the last good run on `main` \(abc1234\)\./);
+  const saving = await run(['--current', base, '--saving-baseline']);
+  assert.match(saving.out, /saved as the new baseline/);
+});
+
+test('without a baseline, outputs say so', async () => {
+  const dir = tmp();
+  const env = { GITHUB_OUTPUT: join(dir, 'output') };
+  await run(['--current', fixturePath('baseline.handle-summary.json'), '--quiet'], env);
+  assert.equal(readFileSync(env.GITHUB_OUTPUT, 'utf8'), 'verdict=pass\nbaseline-found=false\nregressions=0\n');
+});
+
+test('a named comment ignores the unnamed one and vice versa', async () => {
+  const gh = fakeGitHub([[{ id: 1, body: `${MARKER}\nunnamed` }, { id: 2, body: '<!-- k6-pr-guard:api -->\nnamed' }]]);
+  const opts = { token: 't', repo: 'o/r', prNumber: 5, apiUrl: 'https://api', fetchImpl: gh.fetchImpl };
+  await upsertPrComment({ ...opts, body: 'x', marker: '<!-- k6-pr-guard:api -->' });
+  assert.equal(gh.calls.at(-1).url, 'https://api/repos/o/r/issues/comments/2');
+  await upsertPrComment({ ...opts, body: 'y' });
+  assert.equal(gh.calls.at(-1).url, 'https://api/repos/o/r/issues/comments/1');
+  await upsertPrComment({ ...opts, body: 'z', marker: '<!-- k6-pr-guard:web -->' });
+  assert.equal(gh.calls.at(-1).method, 'POST');
 });
