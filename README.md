@@ -44,7 +44,7 @@ jobs:
       - uses: grafana/setup-k6-action@v1
       - run: k6 run --summary-export=k6-summary.json tests/load.js
         continue-on-error: true # let the guard report even when a k6 threshold fails
-      - uses: YOUR_GITHUB_USER/k6-pr-guard@v0
+      - uses: fatnisponxhaj/k6-pr-guard@v0
         with:
           summary: k6-summary.json
 ```

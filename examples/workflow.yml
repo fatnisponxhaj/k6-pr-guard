@@ -25,7 +25,7 @@ jobs:
         continue-on-error: true
         run: k6 run --summary-export=k6-summary.json tests/load.js
 
-      - uses: YOUR_GITHUB_USER/k6-pr-guard@v0
+      - uses: fatnisponxhaj/k6-pr-guard@v0
         with:
           summary: k6-summary.json
           p95-budget: 10
