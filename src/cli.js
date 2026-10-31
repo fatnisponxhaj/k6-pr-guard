@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// k6-pr-guard: compare a k6 JSON summary with a baseline and print a pass/fail Markdown report.
+// p95guard: compare a k6 JSON summary with a baseline and print a pass/fail Markdown report.
 // Exit codes: 0 = pass, 1 = regression, 2 = bad input or usage.
 
 import { appendFileSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
@@ -10,7 +10,7 @@ import { compare, DEFAULTS } from './compare.js';
 import { markerFor, NAME_PATTERN, renderMarkdown } from './report.js';
 import { prNumberFromEvent, upsertPrComment } from './github.js';
 
-const HELP = `Usage: k6-pr-guard --current <summary.json> [--baseline <summary.json>] [options]
+const HELP = `Usage: p95guard --current <summary.json> [--baseline <summary.json>] [options]
 
 Reads k6 JSON summaries (from --summary-export or handleSummary) and fails when
 latency or error rate got worse than the budget allows.
@@ -35,7 +35,7 @@ Output
   --comment               Post or update a PR comment (needs GITHUB_TOKEN, runs inside GitHub Actions)
   --name <id>             Test name, when one repo runs several k6 tests. Each name gets its own
                           PR comment. Letters, digits, ".", "_" and "-" only.
-  --title <text>          Report heading (default: "k6 PR Guard", plus the name if given)
+  --title <text>          Report heading (default: "p95 Guard", plus the name if given)
   --baseline-label <text> Says what the baseline is, e.g. "the last good run on main (abc1234)"
   --saving-baseline       This run is a candidate baseline (default branch), not a PR to compare
   --warn-only             Always exit 0, even on a regression
@@ -84,7 +84,7 @@ export async function main(argv = process.argv.slice(2), env = process.env, out 
     return 2;
   }
   if (args.name !== undefined && !NAME_PATTERN.test(args.name)) {
-    err.write(`k6-pr-guard: --name may only use letters, digits, ".", "_" and "-" (max 64), got "${args.name}"\n`);
+    err.write(`p95guard: --name may only use letters, digits, ".", "_" and "-" (max 64), got "${args.name}"\n`);
     return 2;
   }
 
@@ -104,7 +104,7 @@ export async function main(argv = process.argv.slice(2), env = process.env, out 
     current = loadSummary(args.current);
     baseline = args.baseline && existsSync(args.baseline) ? loadSummary(args.baseline) : null;
   } catch (e) {
-    err.write(`k6-pr-guard: ${e.message}\n`);
+    err.write(`p95guard: ${e.message}\n`);
     return 2;
   }
 
@@ -131,19 +131,19 @@ export async function main(argv = process.argv.slice(2), env = process.env, out 
 async function postComment(body, marker, env, err) {
   const prNumber = prNumberFromEvent(env.GITHUB_EVENT_PATH);
   if (!prNumber) {
-    err.write('k6-pr-guard: not a pull_request event, skipping the PR comment.\n');
+    err.write('p95guard: not a pull_request event, skipping the PR comment.\n');
     return;
   }
   if (!env.GITHUB_TOKEN || !env.GITHUB_REPOSITORY) {
-    err.write('::warning::k6-pr-guard: GITHUB_TOKEN or GITHUB_REPOSITORY missing, skipping the PR comment.\n');
+    err.write('::warning::p95guard: GITHUB_TOKEN or GITHUB_REPOSITORY missing, skipping the PR comment.\n');
     return;
   }
   try {
     const url = await upsertPrComment({ token: env.GITHUB_TOKEN, repo: env.GITHUB_REPOSITORY, prNumber, body, marker, apiUrl: env.GITHUB_API_URL });
-    err.write(`k6-pr-guard: PR comment at ${url}\n`);
+    err.write(`p95guard: PR comment at ${url}\n`);
   } catch (e) {
     // Fork PRs get a read-only token. The report is still in the job summary, so don't fail the job over it.
-    err.write(`::warning::k6-pr-guard: could not post the PR comment (${e.message}). The report is in the job summary.\n`);
+    err.write(`::warning::p95guard: could not post the PR comment (${e.message}). The report is in the job summary.\n`);
   }
 }
 

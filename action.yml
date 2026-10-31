@@ -1,5 +1,5 @@
-name: k6 PR Guard
-description: Compare each k6 run with the last good run and post the p95/p99 and error-rate change as a pass/fail PR comment.
+name: p95 Guard
+description: Catch performance regressions in PRs. Compares k6 load test results with the last good run and posts a pass/fail comment.
 branding:
   icon: activity
   color: purple
@@ -54,7 +54,7 @@ inputs:
     default: 'true'
   cache-key-prefix:
     description: Cache key prefix for the stored baseline. Prefer "name" to separate several tests.
-    default: k6-pr-guard-baseline
+    default: p95guard-baseline
   github-token:
     description: Token used to post the PR comment. Needs pull-requests write permission.
     default: ${{ github.token }}
@@ -91,7 +91,7 @@ runs:
         DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
       run: |
         if [ -n "$NAME" ] && ! [[ "$NAME" =~ ^[A-Za-z0-9._-]{1,64}$ ]]; then
-          echo "::error::k6-pr-guard: name may only use letters, digits, '.', '_' and '-' (got '$NAME')"
+          echo "::error::p95guard: name may only use letters, digits, '.', '_' and '-' (got '$NAME')"
           exit 2
         fi
         mode="$MODE"
@@ -101,17 +101,17 @@ runs:
           else mode=compare; fi
         fi
         case "$mode" in compare|save-baseline) ;; *)
-          echo "::error::k6-pr-guard: mode must be auto, compare or save-baseline (got '$MODE')"
+          echo "::error::p95guard: mode must be auto, compare or save-baseline (got '$MODE')"
           exit 2 ;;
         esac
         # The cache path is part of the cache version, so different names can never restore each other's
         # baseline, even when one key prefix matches another ("api-" also matches "api-v2-...").
         if [ -n "$NAME" ]; then
-          path=".k6-pr-guard/$NAME/baseline.json"; key="$PREFIX-$NAME"
+          path=".p95guard/$NAME/baseline.json"; key="$PREFIX-$NAME"
         else
-          path=".k6-pr-guard/baseline.json"; key="$PREFIX"
+          path=".p95guard/baseline.json"; key="$PREFIX"
         fi
-        echo "k6-pr-guard mode: $mode${NAME:+ (name: $NAME)}"
+        echo "p95guard mode: $mode${NAME:+ (name: $NAME)}"
         { echo "mode=$mode"; echo "path=$path"; echo "key=$key"; } >> "$GITHUB_OUTPUT"
 
     # Caches saved on the default branch can be restored from pull requests.
@@ -155,7 +155,7 @@ runs:
         args=(--current "$SUMMARY" --baseline "$baseline" --baseline-label "$label"
               --p95 "$P95" --p99 "$P99" --min-delta-ms "$MIN_DELTA"
               --error-rate "$ERRORS" --checks "$CHECKS"
-              --markdown "$RUNNER_TEMP/k6-pr-guard${NAME:+-$NAME}.md" --quiet)
+              --markdown "$RUNNER_TEMP/p95guard${NAME:+-$NAME}.md" --quiet)
         for m in ${METRICS//,/ }; do args+=(--metric "$m"); done
         [ -n "$NAME" ] && args+=(--name "$NAME")
         [ "$IGNORE_THRESHOLDS" = true ] && args+=(--ignore-thresholds)
@@ -175,7 +175,7 @@ runs:
         IGNORE_THRESHOLDS: ${{ inputs.ignore-thresholds }}
       run: |
         args=(--current "$SUMMARY" --saving-baseline --quiet
-              --markdown "$RUNNER_TEMP/k6-pr-guard${NAME:+-$NAME}.md")
+              --markdown "$RUNNER_TEMP/p95guard${NAME:+-$NAME}.md")
         for m in ${METRICS//,/ }; do args+=(--metric "$m"); done
         [ -n "$NAME" ] && args+=(--name "$NAME")
         [ "$IGNORE_THRESHOLDS" = true ] && args+=(--ignore-thresholds)

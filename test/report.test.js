@@ -7,7 +7,7 @@ import { load, makeSummary } from './helpers.js';
 test('failing report has marker, reasons and table', () => {
   const md = renderMarkdown(compare(load('regressed.handle-summary.json'), load('baseline.handle-summary.json')), { runUrl: 'https://example.test/run/1' });
   assert.ok(md.startsWith(MARKER));
-  assert.match(md, /## ❌ k6 PR Guard: performance regression/);
+  assert.match(md, /## ❌ p95 Guard: performance regression/);
   assert.match(md, /\*\*Why it failed\*\*/);
   assert.match(md, /\| `http_req_duration` \| p\(95\) \| \d+\.\d ms \| \d+\.\d ms \| \+\d+\.\d ms \(\+\d+\.\d%\) \| 🔺 regressed \|/);
   assert.match(md, /\[Workflow run\]\(https:\/\/example\.test\/run\/1\)/);
@@ -39,8 +39,8 @@ test('pipes in tag values do not break the table', () => {
 
 test('named tests get their own marker and heading', () => {
   const md = renderMarkdown(compare(makeSummary(), null), { name: 'checkout-api' });
-  assert.ok(md.startsWith('<!-- k6-pr-guard:checkout-api -->\n'));
-  assert.match(md, /## ✅ k6 PR Guard · checkout-api: no performance regression/);
+  assert.ok(md.startsWith('<!-- p95guard:checkout-api -->\n'));
+  assert.match(md, /## ✅ p95 Guard · checkout-api: no performance regression/);
 });
 
 test('markers never match each other by substring', () => {

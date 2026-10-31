@@ -2,7 +2,13 @@
 
 All notable changes are listed here. The project follows [semantic versioning](https://semver.org): `@v0` always points to the newest `v0.x.y` release.
 
-## [0.2.0] - unreleased
+## [0.3.0] - 2026-10-31
+
+### Changed
+- **Renamed from "k6 PR Guard" to "p95 Guard"** (repository `fatnisponxhaj/p95guard`, CLI `p95guard`). Use `fatnisponxhaj/p95guard@v0` in your workflows.
+- The PR comment marker, cache key prefix (`p95guard-baseline`) and cache path (`.p95guard/`) use the new name. The first pull request after upgrading compares against nothing until the default branch has run once.
+
+## [0.2.0] - 2026-10-31
 
 ### Added
 - `name` input: run several k6 tests in one repo. Each name gets its own baseline and its own PR comment.
@@ -26,5 +32,6 @@ Upgrading from 0.1: nothing to change. Unnamed tests keep the same baseline and 
 
 First release: PR comment with p95/p99, error rate, checks and k6 thresholds, baseline in the Actions cache, CLI.
 
-[0.2.0]: https://github.com/fatnisponxhaj/k6-pr-guard/compare/v0.1.0...main
-[0.1.0]: https://github.com/fatnisponxhaj/k6-pr-guard/releases/tag/v0.1.0
+[0.3.0]: https://github.com/fatnisponxhaj/p95guard/compare/v0.2.0...v0.3.0
+[0.2.0]: https://github.com/fatnisponxhaj/p95guard/compare/v0.1.0...v0.2.0
+[0.1.0]: https://github.com/fatnisponxhaj/p95guard/releases/tag/v0.1.0

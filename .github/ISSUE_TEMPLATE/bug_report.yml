@@ -12,7 +12,7 @@ body:
   - type: input
     id: version
     attributes:
-      label: k6 PR Guard version
+      label: p95 Guard version
       placeholder: "v0.2.0 (or the @ref in your workflow)"
     validations:
       required: true
@@ -36,11 +36,11 @@ body:
     id: workflow
     attributes:
       label: Workflow
-      description: The k6 and k6 PR Guard steps from your workflow file.
+      description: The k6 and p95 Guard steps from your workflow file.
       render: yaml
   - type: textarea
     id: logs
     attributes:
       label: Logs or report
-      description: The k6 PR Guard step log, or the PR comment. Remove anything private.
+      description: The p95 Guard step log, or the PR comment. Remove anything private.
       render: text

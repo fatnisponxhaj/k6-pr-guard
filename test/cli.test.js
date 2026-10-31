@@ -18,7 +18,7 @@ const run = async (argv, env = {}) => {
   const code = await main(argv, env, out, err);
   return { code, out: out.text, err: err.text };
 };
-const tmp = () => mkdtempSync(join(tmpdir(), 'k6-pr-guard-'));
+const tmp = () => mkdtempSync(join(tmpdir(), 'p95guard-'));
 
 test('exit 0 on pass, 1 on regression', async () => {
   const base = fixturePath('baseline.handle-summary.json');
@@ -118,8 +118,8 @@ test('updates our earlier comment, even on page 2', async () => {
 test('--name changes the marker and heading; bad names exit 2', async () => {
   const r = await run(['--current', fixturePath('baseline.handle-summary.json'), '--name', 'api']);
   assert.equal(r.code, 0);
-  assert.ok(r.out.startsWith('<!-- k6-pr-guard:api -->'));
-  assert.match(r.out, /k6 PR Guard · api/);
+  assert.ok(r.out.startsWith('<!-- p95guard:api -->'));
+  assert.match(r.out, /p95 Guard · api/);
   const bad = await run(['--current', fixturePath('baseline.handle-summary.json'), '--name', 'x -->']);
   assert.equal(bad.code, 2);
   assert.match(bad.err, /--name may only use/);
@@ -141,13 +141,13 @@ test('without a baseline, outputs say so', async () => {
 });
 
 test('a named comment ignores the unnamed one and vice versa', async () => {
-  const gh = fakeGitHub([[{ id: 1, body: `${MARKER}\nunnamed` }, { id: 2, body: '<!-- k6-pr-guard:api -->\nnamed' }]]);
+  const gh = fakeGitHub([[{ id: 1, body: `${MARKER}\nunnamed` }, { id: 2, body: '<!-- p95guard:api -->\nnamed' }]]);
   const opts = { token: 't', repo: 'o/r', prNumber: 5, apiUrl: 'https://api', fetchImpl: gh.fetchImpl };
-  await upsertPrComment({ ...opts, body: 'x', marker: '<!-- k6-pr-guard:api -->' });
+  await upsertPrComment({ ...opts, body: 'x', marker: '<!-- p95guard:api -->' });
   assert.equal(gh.calls.at(-1).url, 'https://api/repos/o/r/issues/comments/2');
   await upsertPrComment({ ...opts, body: 'y' });
   assert.equal(gh.calls.at(-1).url, 'https://api/repos/o/r/issues/comments/1');
-  await upsertPrComment({ ...opts, body: 'z', marker: '<!-- k6-pr-guard:web -->' });
+  await upsertPrComment({ ...opts, body: 'z', marker: '<!-- p95guard:web -->' });
   assert.equal(gh.calls.at(-1).method, 'POST');
 });
 
