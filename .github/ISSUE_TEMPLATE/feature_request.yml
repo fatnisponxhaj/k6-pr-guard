@@ -16,4 +16,4 @@ body:
   - type: input
     id: team
     attributes:
-      label: Team size and how often k6 runs in your CI (optional)
+      label: Team size and how often load tests run in your CI (optional)
