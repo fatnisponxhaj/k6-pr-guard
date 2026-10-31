@@ -56,7 +56,7 @@ jobs:
         env:
           DURATION: 15s
 
-      - name: k6 PR Guard
+      - name: p95 Guard
         uses: ./
         with:
           summary: k6-summary.json
@@ -120,4 +120,4 @@ jobs:
           test "$SLOW_BASELINE" = true
           test "$SLOW_REGRESSIONS" -gt 0
           test "$SAME" = pass
-          grep -q '<!-- k6-pr-guard:self-test-slowdown -->' "$REPORT"
+          grep -q '<!-- p95guard:self-test-slowdown -->' "$REPORT"

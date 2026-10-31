@@ -1,4 +1,4 @@
-// Tiny local HTTP server for trying k6 PR Guard without a real backend.
+// Tiny local HTTP server for trying p95 Guard without a real backend.
 // DELAY_MS sets the base latency, JITTER_MS adds random spread, ERROR_RATE (0..1) returns 500s.
 import http from 'node:http';
 

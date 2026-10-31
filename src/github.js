@@ -24,7 +24,7 @@ export async function upsertPrComment({ token, repo, prNumber, body, marker = MA
     accept: 'application/vnd.github+json',
     'x-github-api-version': '2022-11-28',
     'content-type': 'application/json',
-    'user-agent': 'k6-pr-guard',
+    'user-agent': 'p95guard',
   };
   const call = async (method, url, payload) => {
     const res = await fetchImpl(url, { method, headers, body: payload ? JSON.stringify(payload) : undefined });

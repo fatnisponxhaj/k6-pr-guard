@@ -1,10 +1,12 @@
-# k6 PR Guard
+# p95 Guard
 
-[![CI](https://github.com/fatnisponxhaj/k6-pr-guard/actions/workflows/ci.yml/badge.svg)](https://github.com/fatnisponxhaj/k6-pr-guard/actions/workflows/ci.yml)
-[![GitHub Marketplace](https://img.shields.io/badge/Marketplace-k6%20PR%20Guard-7c3aed?logo=github)](https://github.com/marketplace/actions/k6-pr-guard)
+[![CI](https://github.com/fatnisponxhaj/p95guard/actions/workflows/ci.yml/badge.svg)](https://github.com/fatnisponxhaj/p95guard/actions/workflows/ci.yml)
+[![GitHub Marketplace](https://img.shields.io/badge/Marketplace-p95%20Guard-7c3aed?logo=github)](https://github.com/marketplace/actions/p95-guard)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-**Catch performance regressions before they merge.** k6 PR Guard compares each pull request's k6 run with the last good run on your main branch and posts the change in p95/p99 latency, error rate and checks as a pass/fail PR comment.
+**Catch performance regressions before they merge.** p95 Guard compares each pull request's [k6](https://k6.io) load test results with the last good run on your main branch and posts the change in p95/p99 latency, error rate and checks as a pass/fail PR comment.
+
+> Formerly *k6 PR Guard*. If you used `fatnisponxhaj/k6-pr-guard@v0`, switch to `fatnisponxhaj/p95guard@v0`.
 
 ![Example PR comment: p95 went from 30.0 ms to 55.0 ms, error rate from 0% to 2.7%, so the check fails](docs/pr-comment.png)
 
@@ -39,7 +41,7 @@ jobs:
       - uses: grafana/setup-k6-action@v1
       - run: k6 run --summary-export=k6-summary.json tests/load.js
         continue-on-error: true # let the guard report even when a k6 threshold fails
-      - uses: fatnisponxhaj/k6-pr-guard@v0
+      - uses: fatnisponxhaj/p95guard@v0
         with:
           summary: k6-summary.json
 ```
@@ -77,7 +79,7 @@ flowchart LR
 | `ignore-thresholds` | `false` | Don't fail on k6's own failed thresholds |
 | `fail-on-regression` | `true` | `false` = report only, never fail the job |
 | `comment` | `true` | Post and update the PR comment |
-| `cache-key-prefix` | `k6-pr-guard-baseline` | Cache key prefix for the baseline |
+| `cache-key-prefix` | `p95guard-baseline` | Cache key prefix for the baseline |
 | `github-token` | `${{ github.token }}` | Token for the PR comment |
 
 ## Outputs
@@ -97,11 +99,11 @@ flowchart LR
 Give each test a `name`. Each gets its own baseline and its own PR comment.
 
 ```yaml
-- uses: fatnisponxhaj/k6-pr-guard@v0
+- uses: fatnisponxhaj/p95guard@v0
   with:
     name: api
     summary: api-summary.json
-- uses: fatnisponxhaj/k6-pr-guard@v0
+- uses: fatnisponxhaj/p95guard@v0
   with:
     name: checkout
     summary: checkout-summary.json
@@ -112,7 +114,7 @@ Give each test a `name`. Each gets its own baseline and its own PR comment.
 Start in report-only mode for a week, look at the numbers, then tune the budgets.
 
 ```yaml
-- uses: fatnisponxhaj/k6-pr-guard@v0
+- uses: fatnisponxhaj/p95guard@v0
   with:
     fail-on-regression: false
 ```
@@ -120,7 +122,7 @@ Start in report-only mode for a week, look at the numbers, then tune the budgets
 ### Compare custom metrics
 
 ```yaml
-- uses: fatnisponxhaj/k6-pr-guard@v0
+- uses: fatnisponxhaj/p95guard@v0
   with:
     metrics: http_req_duration, checkout_latency
 ```
@@ -130,7 +132,7 @@ Start in report-only mode for a week, look at the numbers, then tune the budgets
 Commit a summary you trust and compare against it, without the cache.
 
 ```yaml
-- uses: fatnisponxhaj/k6-pr-guard@v0
+- uses: fatnisponxhaj/p95guard@v0
   with:
     baseline: perf/baseline.json
 ```
@@ -138,12 +140,12 @@ Commit a summary you trust and compare against it, without the cache.
 ### Keep the report as an artifact
 
 ```yaml
-- uses: fatnisponxhaj/k6-pr-guard@v0
+- uses: fatnisponxhaj/p95guard@v0
   id: guard
 - uses: actions/upload-artifact@v7
   if: always()
   with:
-    name: k6-pr-guard-report
+    name: p95guard-report
     path: ${{ steps.guard.outputs.report }}
 ```
 
@@ -174,8 +176,12 @@ Exit code 0 = pass, 1 = regression, 2 = bad input. Run `node src/cli.js --help` 
 
 ## Contributing
 
-Bug reports and ideas are very welcome: [open an issue](https://github.com/fatnisponxhaj/k6-pr-guard/issues/new/choose). See [CONTRIBUTING.md](CONTRIBUTING.md) to run the tests and record your own k6 fixtures.
+Bug reports and ideas are very welcome: [open an issue](https://github.com/fatnisponxhaj/p95guard/issues/new/choose). See [CONTRIBUTING.md](CONTRIBUTING.md) to run the tests and record your own k6 fixtures.
 
 ## License
 
 [MIT](LICENSE)
+
+## Trademarks
+
+p95 Guard is an independent project. It is not affiliated with, endorsed or sponsored by Grafana Labs or its affiliates. k6 is a trademark of Grafana Labs, used here only to describe compatibility.

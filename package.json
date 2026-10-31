@@ -1,10 +1,16 @@
 {
-  "name": "k6-pr-guard",
-  "version": "0.2.0",
-  "description": "Compare each k6 run with the last good run and post p95/p99 and error-rate changes as a pass/fail PR comment.",
+  "name": "p95guard",
+  "version": "0.3.0",
+  "description": "Catch performance regressions in pull requests: compares k6 load test results with the last good run and posts p95/p99 and error-rate changes as a pass/fail PR comment.",
+  "homepage": "https://p95guard.dev",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/fatnisponxhaj/p95guard.git"
+  },
+  "bugs": "https://github.com/fatnisponxhaj/p95guard/issues",
   "type": "module",
   "bin": {
-    "k6-pr-guard": "src/cli.js"
+    "p95guard": "src/cli.js"
   },
   "files": [
     "src"

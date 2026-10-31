@@ -3,14 +3,14 @@
 import { fmtMs, fmtNumber, fmtPct } from './compare.js';
 
 // Hidden marker used to find and update our own comment instead of posting a new one each push.
-export const MARKER = '<!-- k6-pr-guard -->';
+export const MARKER = '<!-- p95guard -->';
 
 // Test names end up inside an HTML comment and a cache key, so keep them plain.
 export const NAME_PATTERN = /^[A-Za-z0-9._-]{1,64}$/;
 
-/** Each named test gets its own comment. Unnamed keeps the v0.1 marker so old comments still update. */
+/** Each named test gets its own comment; unnamed tests share the plain marker. */
 export function markerFor(name) {
-  return name ? `<!-- k6-pr-guard:${name} -->` : MARKER;
+  return name ? `<!-- p95guard:${name} -->` : MARKER;
 }
 
 const STATUS = {
@@ -22,7 +22,7 @@ const STATUS = {
 };
 
 export function renderMarkdown(result, { name, title, baselineLabel = 'the last good run on the main branch', runUrl } = {}) {
-  title ??= name ? `k6 PR Guard · ${name}` : 'k6 PR Guard';
+  title ??= name ? `p95 Guard · ${name}` : 'p95 Guard';
   const lines = [markerFor(name)];
   const pass = result.verdict === 'pass';
   lines.push(`## ${pass ? '✅' : '❌'} ${title}: ${pass ? 'no performance regression' : 'performance regression'}`);

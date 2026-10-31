@@ -1,4 +1,4 @@
-// Example k6 test with two scenarios. Writes the JSON summary k6 PR Guard reads.
+// Example k6 test with two scenarios. Writes the JSON summary p95 Guard reads.
 import http from 'k6/http';
 import { check } from 'k6';
 

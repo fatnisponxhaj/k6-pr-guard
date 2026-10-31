@@ -1,5 +1,5 @@
 node_modules/
 k6-summary.json
-.k6-pr-guard/
+.p95guard/
 *.local.json
 .DS_Store
