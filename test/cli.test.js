@@ -150,3 +150,18 @@ test('a named comment ignores the unnamed one and vice versa', async () => {
   await upsertPrComment({ ...opts, body: 'z', marker: '<!-- k6-pr-guard:web -->' });
   assert.equal(gh.calls.at(-1).method, 'POST');
 });
+
+test('only the env passed to main() is used, never the real process.env', async () => {
+  // Regression: on pull_request CI runs, the real GITHUB_EVENT_PATH leaked into tests.
+  const dir = tmp();
+  writeFileSync(join(dir, 'event.json'), JSON.stringify({ pull_request: { number: 99 } }));
+  const saved = process.env.GITHUB_EVENT_PATH;
+  process.env.GITHUB_EVENT_PATH = join(dir, 'event.json');
+  try {
+    const r = await run(['--current', fixturePath('baseline.handle-summary.json'), '--comment', '--quiet'], {});
+    assert.match(r.err, /not a pull_request event/);
+  } finally {
+    if (saved === undefined) delete process.env.GITHUB_EVENT_PATH;
+    else process.env.GITHUB_EVENT_PATH = saved;
+  }
+});

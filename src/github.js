@@ -3,8 +3,11 @@
 import { readFileSync } from 'node:fs';
 import { MARKER } from './report.js';
 
-/** Reads the PR number from the Actions event payload, or null outside a pull_request event. */
-export function prNumberFromEvent(eventPath = process.env.GITHUB_EVENT_PATH) {
+/**
+ * Reads the PR number from the Actions event payload, or null outside a pull_request event.
+ * The path is always passed in (no process.env fallback), so callers control which environment is used.
+ */
+export function prNumberFromEvent(eventPath) {
   if (!eventPath) return null;
   try {
     const event = JSON.parse(readFileSync(eventPath, 'utf8'));
