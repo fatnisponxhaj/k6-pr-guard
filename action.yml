@@ -76,7 +76,7 @@ runs:
     # Prefer the exact commit the PR is based on, else the newest baseline.
     - id: restore
       if: steps.mode.outputs.mode == 'compare'
-      uses: actions/cache/restore@v4
+      uses: actions/cache/restore@v6
       with:
         path: .k6-pr-guard/baseline.json
         key: ${{ inputs.cache-key-prefix }}-${{ github.event.pull_request.base.sha || github.sha }}
@@ -125,7 +125,7 @@ runs:
         rm -f .k6-pr-guard-result.json
 
     - if: steps.mode.outputs.mode == 'save-baseline' && steps.check.outputs.verdict == 'pass'
-      uses: actions/cache/save@v4
+      uses: actions/cache/save@v6
       with:
         path: .k6-pr-guard/baseline.json
         key: ${{ inputs.cache-key-prefix }}-${{ github.sha }}

@@ -39,7 +39,7 @@ jobs:
   k6:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       # ...start the service you want to test...
       - uses: grafana/setup-k6-action@v1
       - run: k6 run --summary-export=k6-summary.json tests/load.js
