@@ -1,0 +1,32 @@
+# Copy to .github/workflows/k6.yml in your repo and point it at your own k6 test.
+name: k6 performance
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+  pull-requests: write # to post the PR comment
+
+jobs:
+  k6:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Start the service you want to test here (docker compose up -d, npm start &, ...).
+
+      - uses: grafana/setup-k6-action@v1
+
+      # k6 exits non-zero when a threshold fails. Keep going so the guard can still report.
+      - name: Run k6
+        continue-on-error: true
+        run: k6 run --summary-export=k6-summary.json tests/load.js
+
+      - uses: YOUR_GITHUB_USER/k6-pr-guard@v0
+        with:
+          summary: k6-summary.json
+          p95-budget: 10
+          error-rate-budget: 1

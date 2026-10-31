@@ -1,0 +1,51 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  unit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm test
+
+  # Runs the action against itself: a load test on the demo server.
+  # To see a regression comment, open a PR that raises DELAY_MS below (e.g. to 60).
+  e2e:
+    runs-on: ubuntu-latest
+    env:
+      DELAY_MS: 20
+      ERROR_RATE: 0
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - uses: grafana/setup-k6-action@v1
+
+      - name: Start demo server
+        run: |
+          node examples/demo-server.js &
+          for i in $(seq 1 20); do curl -sf http://localhost:3333/ >/dev/null && break; sleep 0.5; done
+
+      - name: Run k6
+        continue-on-error: true
+        # The test's handleSummary() writes k6-summary.json.
+        run: k6 run --quiet examples/load-test.js
+        env:
+          DURATION: 15s
+
+      - name: k6 PR Guard
+        uses: ./
+        with:
+          summary: k6-summary.json

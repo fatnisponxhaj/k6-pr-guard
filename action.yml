@@ -1,0 +1,131 @@
+name: k6 PR Guard
+description: Compare each k6 run with the last good run and post the p95/p99 and error-rate change as a pass/fail PR comment.
+branding:
+  icon: activity
+  color: purple
+
+inputs:
+  summary:
+    description: Path to the k6 JSON summary (from --summary-export or handleSummary).
+    default: k6-summary.json
+  mode:
+    description: >
+      "auto" saves a baseline on pushes to the default branch and compares on pull requests.
+      Or force "compare" or "save-baseline".
+    default: auto
+  p95-budget:
+    description: Max p(95) latency increase, in percent.
+    default: '10'
+  p99-budget:
+    description: Max p(99) latency increase, in percent.
+    default: '15'
+  min-delta-ms:
+    description: Latency changes smaller than this many milliseconds are ignored as noise.
+    default: '5'
+  error-rate-budget:
+    description: Max http_req_failed increase, in percentage points.
+    default: '1'
+  checks-budget:
+    description: Max drop of the checks pass rate, in percentage points.
+    default: '1'
+  ignore-thresholds:
+    description: Set to "true" to not fail when k6's own thresholds failed.
+    default: 'false'
+  fail-on-regression:
+    description: Set to "false" to only report, never fail the job.
+    default: 'true'
+  comment:
+    description: Post (and keep updating) a PR comment with the report.
+    default: 'true'
+  cache-key-prefix:
+    description: Cache key prefix for the stored baseline. Change it if you run several k6 tests in one repo.
+    default: k6-pr-guard-baseline
+  github-token:
+    description: Token used to post the PR comment. Needs pull-requests write permission.
+    default: ${{ github.token }}
+
+outputs:
+  verdict:
+    description: '"pass" or "fail".'
+    value: ${{ steps.compare.outputs.verdict || steps.check.outputs.verdict }}
+  baseline-found:
+    description: '"true" when a baseline was restored for the comparison.'
+    value: ${{ steps.restore.outputs.cache-matched-key != '' }}
+
+runs:
+  using: composite
+  steps:
+    - id: mode
+      shell: bash
+      env:
+        MODE: ${{ inputs.mode }}
+        EVENT: ${{ github.event_name }}
+        REF: ${{ github.ref }}
+        DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+      run: |
+        mode="$MODE"
+        if [ "$mode" = auto ]; then
+          if [[ "$EVENT" == pull_request* ]]; then mode=compare
+          elif [ "$REF" = "refs/heads/$DEFAULT_BRANCH" ]; then mode=save-baseline
+          else mode=compare; fi
+        fi
+        echo "k6-pr-guard mode: $mode"
+        echo "mode=$mode" >> "$GITHUB_OUTPUT"
+
+    # Caches saved on the default branch can be restored from pull requests.
+    # Prefer the exact commit the PR is based on, else the newest baseline.
+    - id: restore
+      if: steps.mode.outputs.mode == 'compare'
+      uses: actions/cache/restore@v4
+      with:
+        path: .k6-pr-guard/baseline.json
+        key: ${{ inputs.cache-key-prefix }}-${{ github.event.pull_request.base.sha || github.sha }}
+        restore-keys: ${{ inputs.cache-key-prefix }}-
+
+    - id: compare
+      if: steps.mode.outputs.mode == 'compare'
+      shell: bash
+      env:
+        GITHUB_TOKEN: ${{ inputs.github-token }}
+        SUMMARY: ${{ inputs.summary }}
+        P95: ${{ inputs.p95-budget }}
+        P99: ${{ inputs.p99-budget }}
+        MIN_DELTA: ${{ inputs.min-delta-ms }}
+        ERRORS: ${{ inputs.error-rate-budget }}
+        CHECKS: ${{ inputs.checks-budget }}
+        IGNORE_THRESHOLDS: ${{ inputs.ignore-thresholds }}
+        FAIL: ${{ inputs.fail-on-regression }}
+        COMMENT: ${{ inputs.comment }}
+      run: |
+        args=(--current "$SUMMARY" --baseline .k6-pr-guard/baseline.json
+              --p95 "$P95" --p99 "$P99" --min-delta-ms "$MIN_DELTA"
+              --error-rate "$ERRORS" --checks "$CHECKS" --quiet)
+        [ "$IGNORE_THRESHOLDS" = true ] && args+=(--ignore-thresholds)
+        [ "$COMMENT" = true ] && args+=(--comment)
+        [ "$FAIL" = true ] || args+=(--warn-only)
+        node "$GITHUB_ACTION_PATH/src/cli.js" "${args[@]}"
+
+    # Only a run that passes its own thresholds becomes the new baseline ("last good run").
+    - id: check
+      if: steps.mode.outputs.mode == 'save-baseline'
+      shell: bash
+      env:
+        SUMMARY: ${{ inputs.summary }}
+        IGNORE_THRESHOLDS: ${{ inputs.ignore-thresholds }}
+      run: |
+        args=(--current "$SUMMARY" --quiet --warn-only --json .k6-pr-guard-result.json)
+        [ "$IGNORE_THRESHOLDS" = true ] && args+=(--ignore-thresholds)
+        node "$GITHUB_ACTION_PATH/src/cli.js" "${args[@]}"
+        if grep -q '"verdict": "pass"' .k6-pr-guard-result.json; then
+          mkdir -p .k6-pr-guard && cp "$SUMMARY" .k6-pr-guard/baseline.json
+          echo "This run becomes the new baseline."
+        else
+          echo "::warning::k6 run did not pass, so it was not saved as the baseline."
+        fi
+        rm -f .k6-pr-guard-result.json
+
+    - if: steps.mode.outputs.mode == 'save-baseline' && steps.check.outputs.verdict == 'pass'
+      uses: actions/cache/save@v4
+      with:
+        path: .k6-pr-guard/baseline.json
+        key: ${{ inputs.cache-key-prefix }}-${{ github.sha }}

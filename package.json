@@ -1,0 +1,27 @@
+{
+  "name": "k6-pr-guard",
+  "version": "0.1.0",
+  "description": "Compare each k6 run with the last good run and post p95/p99 and error-rate changes as a pass/fail PR comment.",
+  "type": "module",
+  "bin": {
+    "k6-pr-guard": "src/cli.js"
+  },
+  "files": [
+    "src"
+  ],
+  "scripts": {
+    "test": "node --test test/",
+    "demo": "node src/cli.js --current test/fixtures/regressed.handle-summary.json --baseline test/fixtures/baseline.handle-summary.json"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "keywords": [
+    "k6",
+    "load-testing",
+    "performance",
+    "github-action",
+    "ci"
+  ],
+  "license": "MIT"
+}
