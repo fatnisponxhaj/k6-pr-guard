@@ -4,17 +4,21 @@ import { readFileSync } from 'node:fs';
 import { MARKER } from './report.js';
 
 /**
- * Reads the PR number from the Actions event payload, or null outside a pull_request event.
+ * Reads the Actions event payload, or null when there is none.
  * The path is always passed in (no process.env fallback), so callers control which environment is used.
  */
-export function prNumberFromEvent(eventPath) {
+export function readEvent(eventPath) {
   if (!eventPath) return null;
   try {
-    const event = JSON.parse(readFileSync(eventPath, 'utf8'));
-    return event.pull_request?.number ?? null;
+    return JSON.parse(readFileSync(eventPath, 'utf8'));
   } catch {
     return null;
   }
+}
+
+/** The PR number from the Actions event payload, or null outside a pull_request event. */
+export function prNumberFromEvent(eventPath) {
+  return readEvent(eventPath)?.pull_request?.number ?? null;
 }
 
 /** Creates the PR comment, or updates the one we posted before. Returns its URL. */

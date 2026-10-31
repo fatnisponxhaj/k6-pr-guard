@@ -1,6 +1,6 @@
 {
   "name": "p95guard",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Catch performance regressions in pull requests: compares k6 load test results with the last good run and posts p95/p99 and error-rate changes as a pass/fail PR comment.",
   "homepage": "https://p95guard.dev",
   "repository": {

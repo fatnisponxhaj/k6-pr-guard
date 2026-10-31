@@ -8,6 +8,7 @@ Use **Security → Report a vulnerability** on this repository instead. You'll g
 
 - It reads the k6 summary file and the baseline from the GitHub Actions cache.
 - With `comment: true` it uses the job's `GITHUB_TOKEN` to create or update one comment on the pull request. It needs `pull-requests: write` and nothing else.
-- It has no dependencies and sends data only to the GitHub API of the repository it runs in.
+- It has no dependencies. Without `api-key` it sends data only to the GitHub API of the repository it runs in.
+- With `api-key` set, it also sends the run's numbers (metric names and values, repository, branch, commit, PR number, run link) to the p95 Guard Pro API over HTTPS. The key is masked in logs. Store it as a secret.
 
 To limit what any action can do, pin it to a full commit SHA instead of `@v0`.

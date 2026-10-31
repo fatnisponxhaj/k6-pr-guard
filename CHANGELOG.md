@@ -2,6 +2,14 @@
 
 All notable changes are listed here. The project follows [semantic versioning](https://semver.org): `@v0` always points to the newest `v0.x.y` release.
 
+## [0.4.0] - unreleased
+
+### Added
+- `api-key` input: send each run to [p95 Guard Pro](https://p95guard.dev) for trend history, on pull requests and on the default branch. The key is masked in logs. Upload problems are warnings and never fail the job.
+- `api-url` input (for testing) and `uploaded` output.
+- CLI flags `--upload` (key from `P95GUARD_API_KEY`) and `--api-url`.
+- For pull requests, uploads use the PR's head commit and branch, not GitHub's temporary merge commit.
+
 ## [0.3.0] - unreleased
 
 ### Changed
@@ -32,6 +40,7 @@ Upgrading from 0.1: nothing to change. Unnamed tests keep the same baseline and 
 
 First release: PR comment with p95/p99, error rate, checks and k6 thresholds, baseline in the Actions cache, CLI.
 
-[0.3.0]: https://github.com/fatnisponxhaj/p95guard/compare/v0.2.0...main
+[0.4.0]: https://github.com/fatnisponxhaj/p95guard/compare/v0.3.0...main
+[0.3.0]: https://github.com/fatnisponxhaj/p95guard/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/fatnisponxhaj/p95guard/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/fatnisponxhaj/p95guard/releases/tag/v0.1.0

@@ -9,6 +9,7 @@ import { normalizeSummary, SummaryError } from './parse.js';
 import { compare, DEFAULTS } from './compare.js';
 import { markerFor, NAME_PATTERN, renderMarkdown } from './report.js';
 import { prNumberFromEvent, upsertPrComment } from './github.js';
+import { buildPoints, DEFAULT_API_URL, runContext, uploadRun } from './upload.js';
 
 const HELP = `Usage: p95guard --current <summary.json> [--baseline <summary.json>] [options]
 
@@ -38,9 +39,15 @@ Output
   --title <text>          Report heading (default: "p95 Guard", plus the name if given)
   --baseline-label <text> Says what the baseline is, e.g. "the last good run on main (abc1234)"
   --saving-baseline       This run is a candidate baseline (default branch), not a PR to compare
+
   --warn-only             Always exit 0, even on a regression
   --quiet                 Don't print the report to stdout
   -h, --help              Show this help
+
+p95 Guard Pro
+  --upload                Send this run's numbers to p95 Guard Pro for trend history. Reads the key from
+                          the P95GUARD_API_KEY environment variable. Upload problems are warnings only.
+  --api-url <url>         Pro API address (default: P95GUARD_API_URL or ${DEFAULT_API_URL})
 `;
 
 export async function main(argv = process.argv.slice(2), env = process.env, out = process.stdout, err = process.stderr) {
@@ -66,6 +73,8 @@ export async function main(argv = process.argv.slice(2), env = process.env, out 
         title: { type: 'string' },
         'baseline-label': { type: 'string' },
         'saving-baseline': { type: 'boolean', default: false },
+        upload: { type: 'boolean', default: false },
+        'api-url': { type: 'string' },
         'warn-only': { type: 'boolean', default: false },
         quiet: { type: 'boolean', default: false },
         help: { type: 'boolean', short: 'h', default: false },
@@ -116,13 +125,15 @@ export async function main(argv = process.argv.slice(2), env = process.env, out 
   if (args.markdown) writeFileSync(args.markdown, markdown);
   if (args.json) writeFileSync(args.json, JSON.stringify(result, null, 2));
   if (env.GITHUB_STEP_SUMMARY) appendFileSync(env.GITHUB_STEP_SUMMARY, markdown);
+
+  if (args.comment) await postComment(markdown, markerFor(args.name), env, err);
+  const uploaded = args.upload ? await uploadToPro(current, result, args, options, env, err) : false;
+
   if (env.GITHUB_OUTPUT) {
-    const outputs = { verdict: result.verdict, 'baseline-found': result.hasBaseline, regressions: result.regressions };
+    const outputs = { verdict: result.verdict, 'baseline-found': result.hasBaseline, regressions: result.regressions, uploaded };
     if (args.markdown) outputs.report = args.markdown;
     appendFileSync(env.GITHUB_OUTPUT, Object.entries(outputs).map(([k, v]) => `${k}=${v}\n`).join(''));
   }
-
-  if (args.comment) await postComment(markdown, markerFor(args.name), env, err);
 
   if (result.verdict === 'fail' && !args['warn-only']) return 1;
   return 0;
@@ -145,6 +156,31 @@ async function postComment(body, marker, env, err) {
     // Fork PRs get a read-only token. The report is still in the job summary, so don't fail the job over it.
     err.write(`::warning::p95guard: could not post the PR comment (${e.message}). The report is in the job summary.\n`);
   }
+}
+
+// Never fails the run: a broken upload is a warning, the PR check still decides the job.
+async function uploadToPro(current, result, args, options, env, err) {
+  const apiKey = env.P95GUARD_API_KEY;
+  if (!apiKey) {
+    err.write('::warning::p95guard: --upload needs the P95GUARD_API_KEY environment variable, skipping the upload.\n');
+    return false;
+  }
+  const context = runContext(env);
+  if (!context.repo || !context.sha) {
+    err.write('::warning::p95guard: uploading needs GITHUB_REPOSITORY and GITHUB_SHA (run it in GitHub Actions), skipping the upload.\n');
+    return false;
+  }
+  const { points, skipped } = buildPoints(current, options.trendMetrics ?? DEFAULTS.trendMetrics);
+  if (!points.length) {
+    err.write('::warning::p95guard: no numbers to upload in this summary, skipping the upload.\n');
+    return false;
+  }
+  if (skipped) err.write(`p95guard: ${skipped} number(s) left out of the upload (invalid name or over the size limit).\n`);
+
+  const payload = { ...context, test: args.name ?? null, verdict: result.verdict, points };
+  const { ok, message } = await uploadRun({ apiUrl: args['api-url'] ?? env.P95GUARD_API_URL ?? DEFAULT_API_URL, apiKey, payload });
+  err.write(ok ? `p95guard: ${message} (${points.length} numbers).\n` : `::warning::p95guard: upload to p95 Guard Pro failed: ${message}\n`);
+  return ok;
 }
 
 function loadSummary(path) {

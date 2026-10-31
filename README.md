@@ -81,6 +81,8 @@ flowchart LR
 | `comment` | `true` | Post and update the PR comment |
 | `cache-key-prefix` | `p95guard-baseline` | Cache key prefix for the baseline |
 | `github-token` | `${{ github.token }}` | Token for the PR comment |
+| `api-key` | | [p95 Guard Pro](https://p95guard.dev/pricing.html) API key. When set, each run is sent to Pro for trend history |
+| `api-url` | `https://p95guard.dev` | Pro API address (for testing) |
 
 ## Outputs
 
@@ -91,6 +93,7 @@ flowchart LR
 | `baseline-found` | `true` when there was a baseline to compare with |
 | `report` | Path to the Markdown report |
 | `mode` | `compare` or `save-baseline` |
+| `uploaded` | `true` when the run was sent to p95 Guard Pro |
 
 ## Recipes
 
@@ -149,6 +152,18 @@ Commit a summary you trust and compare against it, without the cache.
     path: ${{ steps.guard.outputs.report }}
 ```
 
+### Trend history with p95 Guard Pro
+
+[Pro](https://p95guard.dev/pricing.html) keeps every run for 12 months: p95/p99 over time per endpoint, one view for all your repos, Slack alerts when `main` gets slower. Add your key as the repository secret `P95GUARD_API_KEY`:
+
+```yaml
+- uses: fatnisponxhaj/p95guard@v0
+  with:
+    api-key: ${{ secrets.P95GUARD_API_KEY }}
+```
+
+Runs on the default branch and on pull requests are both sent. Only the numbers from the k6 summary are uploaded (metric names and values) with the repository, branch, commit, PR number and run link. Upload problems show as warnings and never fail your build.
+
 ## Tips
 
 - **Add p(99).** It's not in k6's default summary:
@@ -164,7 +179,7 @@ Commit a summary you trust and compare against it, without the cache.
 
 **How long is the baseline kept?** GitHub removes cache entries that haven't been used for 7 days. If nothing runs for a week, the next PR reports "no baseline yet" and the next push to main creates a new one.
 
-**Does it send my data anywhere?** No. It only talks to the GitHub API of your repository, to post the comment. See [SECURITY.md](SECURITY.md).
+**Does it send my data anywhere?** Not unless you set `api-key`. Without it, the action only talks to your repository's GitHub API to post the comment. With it, the run's numbers also go to p95 Guard Pro. See [SECURITY.md](SECURITY.md).
 
 ## Use it as a CLI
 

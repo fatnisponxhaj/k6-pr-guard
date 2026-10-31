@@ -106,6 +106,23 @@ jobs:
           comment: false
           fail-on-regression: false
 
+      - name: Start a stand-in Pro API
+        run: |
+          EXPECTED_KEY=ci-test-key LOG=pro-requests.jsonl node test/support/mock-pro-api.js &
+          for i in $(seq 1 20); do curl -s http://127.0.0.1:8788/ >/dev/null && break; sleep 0.3; done
+
+      - name: Guard with an API key (uploads to the stand-in)
+        id: upload
+        uses: ./
+        with:
+          name: self-test-upload
+          mode: compare
+          summary: fast.json
+          baseline: fast.json
+          comment: false
+          api-key: ci-test-key
+          api-url: http://127.0.0.1:8788
+
       - name: Check verdicts
         env:
           SLOW: ${{ steps.slow.outputs.verdict }}
@@ -113,6 +130,8 @@ jobs:
           SLOW_BASELINE: ${{ steps.slow.outputs.baseline-found }}
           SAME: ${{ steps.same.outputs.verdict }}
           REPORT: ${{ steps.slow.outputs.report }}
+          UPLOADED: ${{ steps.upload.outputs.uploaded }}
+          SLOW_UPLOADED: ${{ steps.slow.outputs.uploaded }}
         run: |
           echo "slowdown: $SLOW ($SLOW_REGRESSIONS regressions, baseline found: $SLOW_BASELINE)"
           echo "same run, two formats: $SAME"
@@ -121,3 +140,13 @@ jobs:
           test "$SLOW_REGRESSIONS" -gt 0
           test "$SAME" = pass
           grep -q '<!-- p95guard:self-test-slowdown -->' "$REPORT"
+          echo "uploaded with key: $UPLOADED, without key: $SLOW_UPLOADED"
+          test "$UPLOADED" = true
+          test "$SLOW_UPLOADED" = false
+          node -e '
+            const runs = require("fs").readFileSync("pro-requests.jsonl", "utf8").trim().split("\n").map(JSON.parse).filter((r) => r.method === "POST");
+            if (runs.length !== 1) throw new Error(`expected 1 upload, got ${runs.length}`);
+            const b = runs[0].body;
+            if (b.repo !== process.env.GITHUB_REPOSITORY || b.test !== "self-test-upload" || b.verdict !== "pass" || !(b.points.length > 0)) throw new Error(JSON.stringify(b));
+            console.log(`upload ok: ${b.points.length} numbers for ${b.repo}@${b.sha.slice(0, 7)} on ${b.branch}`);
+          '

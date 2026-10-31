@@ -68,7 +68,7 @@ test('writes markdown, json, step summary and output files', async () => {
   assert.ok(readFileSync(join(dir, 'r.md'), 'utf8').startsWith(MARKER));
   assert.equal(JSON.parse(readFileSync(join(dir, 'r.json'), 'utf8')).verdict, 'fail');
   assert.ok(readFileSync(env.GITHUB_STEP_SUMMARY, 'utf8').includes('performance regression'));
-  assert.equal(readFileSync(env.GITHUB_OUTPUT, 'utf8'), `verdict=fail\nbaseline-found=true\nregressions=8\nreport=${join(dir, 'r.md')}\n`);
+  assert.equal(readFileSync(env.GITHUB_OUTPUT, 'utf8'), `verdict=fail\nbaseline-found=true\nregressions=8\nuploaded=false\nreport=${join(dir, 'r.md')}\n`);
 });
 
 test('--comment outside a pull request is skipped, not an error', async () => {
@@ -137,7 +137,7 @@ test('without a baseline, outputs say so', async () => {
   const dir = tmp();
   const env = { GITHUB_OUTPUT: join(dir, 'output') };
   await run(['--current', fixturePath('baseline.handle-summary.json'), '--quiet'], env);
-  assert.equal(readFileSync(env.GITHUB_OUTPUT, 'utf8'), 'verdict=pass\nbaseline-found=false\nregressions=0\n');
+  assert.equal(readFileSync(env.GITHUB_OUTPUT, 'utf8'), 'verdict=pass\nbaseline-found=false\nregressions=0\nuploaded=false\n');
 });
 
 test('a named comment ignores the unnamed one and vice versa', async () => {

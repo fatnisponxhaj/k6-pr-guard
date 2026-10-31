@@ -124,16 +124,18 @@ export function compare(current, baseline, options = {}) {
   };
 }
 
+/** True for the trend metrics (and their tagged sub-metrics) that get compared and uploaded. */
+export function isTrackedTrend(metric, bases) {
+  if (metric.type !== 'trend' || !bases.includes(metric.base)) return false;
+  const tagString = Object.entries(metric.tags).map(([k, v]) => `${k}:${v}`).join(',');
+  return !IGNORED_TAGS.includes(tagString);
+}
+
 function trendNames(current, baseline, bases) {
   const names = new Set();
   for (const summary of [current, baseline]) {
     if (!summary) continue;
-    for (const m of summary.metrics.values()) {
-      if (m.type !== 'trend' || !bases.includes(m.base)) continue;
-      const tagString = Object.entries(m.tags).map(([k, v]) => `${k}:${v}`).join(',');
-      if (IGNORED_TAGS.includes(tagString)) continue;
-      names.add(m.name);
-    }
+    for (const m of summary.metrics.values()) if (isTrackedTrend(m, bases)) names.add(m.name);
   }
   // Parent metric first, then sub-metrics in a stable order.
   return [...names].sort((a, b) => (a.includes('{') - b.includes('{')) || a.localeCompare(b));
