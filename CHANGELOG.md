@@ -10,7 +10,7 @@ All notable changes are listed here. The project follows [semantic versioning](h
 - CLI flags `--upload` (key from `P95GUARD_API_KEY`) and `--api-url`.
 - For pull requests, uploads use the PR's head commit and branch, not GitHub's temporary merge commit.
 
-## [0.3.0] - unreleased
+## [0.3.0] - 2026-10-31
 
 ### Changed
 - **Renamed from "k6 PR Guard" to "p95 Guard"** (repository `fatnisponxhaj/p95guard`, CLI `p95guard`). Use `fatnisponxhaj/p95guard@v0` in your workflows.
