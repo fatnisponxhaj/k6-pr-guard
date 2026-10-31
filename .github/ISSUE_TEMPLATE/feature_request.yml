@@ -1,0 +1,19 @@
+name: Feature request
+description: Suggest an idea or tell us what's missing
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem are you trying to solve?
+      description: Describe your situation, e.g. "our CI runners are noisy and the check fails randomly".
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: What would help?
+  - type: input
+    id: team
+    attributes:
+      label: Team size and how often k6 runs in your CI (optional)
